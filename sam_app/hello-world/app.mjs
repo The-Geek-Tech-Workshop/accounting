@@ -1,6 +1,8 @@
-import { createVerify } from "crypto";
+import { createPublicKey, verify } from "crypto";
 
-const publicKey = process.env.PUBLIC_KEY;
+const publicKey = createPublicKey(process.env.PUBLIC_KEY);
+
+const ENCRYPTION_ALGORITHM = "RSA-SHA512";
 
 /**
  *
@@ -16,13 +18,7 @@ const publicKey = process.env.PUBLIC_KEY;
  */
 
 export const lambdaHandler = async (event, context) => {
-  const verifier = createVerify("RSA-SHA256");
-  verifier.update(input);
-  verifier.verify(
-    Buffer.from(publicKey),
-    Buffer.from(event.headers["X-Hook-Signature"])
-  );
-
+  const verified = verifyEvent(event);
   const response = {
     statusCode: 200,
     body: JSON.stringify({
@@ -31,4 +27,15 @@ export const lambdaHandler = async (event, context) => {
   };
 
   return response;
+};
+
+const verifyEvent = (event) => {
+  const payload = event.body;
+  const payloadSignatureBase64 = event.headers["X-Hook-Signature"];
+  return verify(
+    ENCRYPTION_ALGORITHM,
+    Buffer.from(payload, "utf-8"),
+    publicKey,
+    Buffer.from(payloadSignatureBase64, "base64")
+  );
 };

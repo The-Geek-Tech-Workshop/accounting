@@ -32,7 +32,7 @@
     "X-Forwarded-For": "127.0.0.1, 127.0.0.2",
     "X-Forwarded-Port": "443",
     "X-Forwarded-Proto": "https",
-    "X-Hook-Signature": "foo"
+    "X-Hook-Signature": "MIIqWqVbEz/aze3k34Pz74nbKUlYr8bp+gEJedpqP749MSJ0TJLn2KC4Ji8Xgi34JrvRQAYZY28Hb3sPjUBcqwkSFFgCZgI2TWtLm2Bfiu92F2VlKfZfrjBKINyjoCoTGMEnJGvcqCYqwhlyLP7ASjwuZUURf0xCOOKIADVsdMw="
   },
   "requestContext": {
     "accountId": "123456789012",
