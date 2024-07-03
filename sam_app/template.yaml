@@ -12,6 +12,10 @@ Globals:
     Timeout: 3
 
 Resources:
+  AccountingTransactionSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: AccountingTransactionQueue
   StarlingFeedItemWebhook:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -29,6 +33,22 @@ Resources:
           Properties:
             Path: /starling/feed-item
             Method: post
+  SheetsWriter:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: sheets_writer/
+      Handler: app.lambdaHandler
+      Runtime: nodejs20.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          PUBLIC_KEY: !Ref PublicKey
+      Events:
+        AccountingTransactionSQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt AccountingTransactionSQSQueue.Arn
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
