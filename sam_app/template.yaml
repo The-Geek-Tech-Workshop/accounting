@@ -3,6 +3,8 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   sam_app
 Parameters:
+  SpreadsheetId:
+    Type: String
   PublicKey:
     Type: String
 
@@ -43,7 +45,8 @@ Resources:
         - x86_64
       Environment:
         Variables:
-          PUBLIC_KEY: !Ref PublicKey
+          SPREADSHEET_ID: !Ref SpreadsheetId
+          GOOGLE_APPLICATION_CREDENTIALS: google_credentials.json
       Events:
         AccountingTransactionSQSEvent:
           Type: SQS

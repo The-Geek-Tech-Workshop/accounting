@@ -27,7 +27,9 @@
     }
   },
 
-  "containerEnv": { "AWS_DEFAULT_REGION": "eu-west-2" },
+  "containerEnv": {
+    "AWS_DEFAULT_REGION": "eu-west-2"
+  },
 
   // Features to add to the dev container. More info: https://containers.dev/features.
   // "features": {},
@@ -45,8 +47,10 @@
         "esbenp.prettier-vscode"
       ]
     }
-  }
+  },
 
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
   // "remoteUser": "root"
+
+  "postCreateCommand": "echo \"$GOOGLE_SA_JSON\" > /workspaces/accounting/sam_app/sheets_writer/google_credentials.json"
 }
