@@ -27,19 +27,26 @@ export const lambdaHandler = async (event, context) => {
 
   const sheetsApi = google.sheets({ version: "v4", auth: client });
 
-  const result1 = await sheetsApi.spreadsheets.get({
+  const sheetResult = await sheetsApi.spreadsheets.get({
     spreadsheetId: SPREADSHEET_ID,
     ranges: ["Transactions"],
   });
-  const transactionsSheetId = result1.data.sheets[0].properties.sheetId;
+  const transactionsSheetId = sheetResult.data.sheets[0].properties.sheetId;
+
+  const rowResult = await sheetsApi.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    valueRenderOption: "FORMULA",
+    range: "Transactions!A3:I3",
+  });
+
+  const existingRow = rowResult.data.values[0];
 
   const creditedAccount = "GTW";
   const debitedAccount = "Equipment";
-  const accountTypeFunction = "";
   const skuOrPurchaseId = "";
 
   // Insert new row and then sort all rows by date column
-  const result = await sheetsApi.spreadsheets.batchUpdate({
+  await sheetsApi.spreadsheets.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,
     resource: {
       requests: [
@@ -55,35 +62,46 @@ export const lambdaHandler = async (event, context) => {
             inheritFromBefore: true,
           },
         },
+      ],
+    },
+  });
+
+  const result = await sheetsApi.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: "Transactions!A3:I3",
+    valueInputOption: "USER_ENTERED",
+    resource: {
+      values: [
+        [
+          event.transactionDate,
+          creditedAccount,
+          existingRow[2],
+          debitedAccount,
+          existingRow[4],
+          event.amount,
+          skuOrPurchaseId,
+          event.description,
+          event.who,
+        ],
+      ],
+    },
+  });
+
+  await sheetsApi.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    resource: {
+      requests: [
         {
-          updateCells: {
-            rows: [
-              {
-                values: [
-                  event.transactionDate,
-                  creditedAccount,
-                  debitedAccount,
-                  accountTypeFunction,
-                  event.amount,
-                  skuOrPurchaseId,
-                  event.description,
-                  event.who,
-                ].map((v) => {
-                  return {
-                    formattedValue: `${v}`,
-                  };
-                }),
-              },
-            ],
-            fields:
-              "formattedValue,formattedValue,formattedValue,formattedValue,formattedValue,formattedValue,formattedValue,formattedValue",
+          sortRange: {
             range: {
               sheetId: transactionsSheetId,
-              startColumnIndex: 0,
-              endColumnIndex: 8,
-              startRowIndex: 2,
-              endRowIndex: 3,
             },
+            sortSpecs: [
+              {
+                dimensionIndex: 0,
+                sortOrder: "DESCENDING",
+              },
+            ],
           },
         },
       ],

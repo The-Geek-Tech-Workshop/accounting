@@ -41,6 +41,7 @@ Resources:
       CodeUri: sheets_writer/
       Handler: app.lambdaHandler
       Runtime: nodejs20.x
+      Timeout: 10
       Architectures:
         - x86_64
       Environment:
