@@ -40,10 +40,8 @@ export const lambdaHandler = async (event, context) => {
   });
 
   const existingRow = rowResult.data.values[0];
-
-  const creditedAccount = "GTW";
-  const debitedAccount = "Equipment";
-  const skuOrPurchaseId = "";
+  const creditedAccountAssetLookupFunction = existingRow[2];
+  const debitedAccountAssetLookupFunction = existingRow[4];
 
   // Insert new row and then sort all rows by date column
   await sheetsApi.spreadsheets.batchUpdate({
@@ -52,7 +50,6 @@ export const lambdaHandler = async (event, context) => {
       requests: [
         {
           insertDimension: {
-            // Transactions!A3:I3
             range: {
               sheetId: transactionsSheetId,
               dimension: "ROWS",
@@ -74,12 +71,12 @@ export const lambdaHandler = async (event, context) => {
       values: [
         [
           event.transactionDate,
-          creditedAccount,
-          existingRow[2],
-          debitedAccount,
-          existingRow[4],
+          event.creditedAccount,
+          creditedAccountAssetLookupFunction,
+          event.debitedAccount,
+          debitedAccountAssetLookupFunction,
           event.amount,
-          skuOrPurchaseId,
+          event.skuOrPurchaseId,
           event.description,
           event.who,
         ],
