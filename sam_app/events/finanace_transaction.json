@@ -1,0 +1,10 @@
+{
+  "transactionId": "STAR-12345",
+  "transactionDate": "01/01/2025",
+  "creditedAccount": "GTW",
+  "debitedAccount": "Equipment",
+  "skuOrPurchaseId": "",
+  "amount": 2.9,
+  "description": "A widget",
+  "who": "Widgets R Us"
+}
