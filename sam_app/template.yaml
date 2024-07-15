@@ -14,12 +14,8 @@ Globals:
     Timeout: 10
 
 Resources:
-  AccountingTransactionSQSQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: AccountingTransactionQueue
   StarlingFeedItemWebhook:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function
     Properties:
       CodeUri: starling_feed_item_webhook/
       Handler: app.lambdaHandler
@@ -35,6 +31,10 @@ Resources:
           Properties:
             Path: /starling/feed-item
             Method: post
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: SQS
   SheetsWriter:
     Type: AWS::Serverless::Function
     Properties:
@@ -47,11 +47,6 @@ Resources:
         Variables:
           SPREADSHEET_ID: !Ref SpreadsheetId
           GOOGLE_APPLICATION_CREDENTIALS: ./google_credentials.json
-      Events:
-        AccountingTransactionSQSEvent:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt AccountingTransactionSQSQueue.Arn
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
@@ -62,7 +57,4 @@ Outputs:
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
   StarlingFeedItemWebhook:
     Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  StarlingFeedItemWebhookIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+    Value: !GetAtt StarlingFeedItemWebhook.Arn
