@@ -11,7 +11,7 @@ const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 /**
  *
  * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
- * @param {Object} event - API Gateway Lambda Proxy Input Format
+ * @param {Object} transaction - API Gateway Lambda Proxy Input Format
  *
  * Context doc: https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-context.html
  * @param {Object} context
@@ -21,7 +21,10 @@ const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
  *
  */
 
-export const lambdaHandler = async (event, context) => {
+export const lambdaHandler = async (event) => {
+  console.log(`EVENT: ${JSON.stringify(event)}`);
+  const transaction = JSON.parse(event.Records[0].body);
+
   const auth = new GoogleAuth({ scopes: SCOPES });
   const client = await auth.getClient();
 
@@ -70,15 +73,15 @@ export const lambdaHandler = async (event, context) => {
     resource: {
       values: [
         [
-          event.transactionDate,
-          event.creditedAccount,
+          transaction.transactionDate,
+          transaction.creditedAccount,
           creditedAccountAssetLookupFunction,
-          event.debitedAccount,
+          transaction.debitedAccount,
           debitedAccountAssetLookupFunction,
-          event.amount,
-          event.skuOrPurchaseId,
-          event.description,
-          event.who,
+          transaction.amount,
+          transaction.skuOrPurchaseId,
+          transaction.description,
+          transaction.who,
         ],
       ],
     },
@@ -104,8 +107,4 @@ export const lambdaHandler = async (event, context) => {
       ],
     },
   });
-
-  return {
-    statusCode: 202,
-  };
 };

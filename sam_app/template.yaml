@@ -7,6 +7,8 @@ Parameters:
     Type: String
   PublicKey:
     Type: String
+  GoogleCredentialsFile:
+    Type: String
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -14,6 +16,10 @@ Globals:
     Timeout: 10
 
 Resources:
+  FinancialTransactionQueue:
+    Type: AWS::SQS::Queue
+  StarlingVerifiedFeedItemQueue:
+    Type: AWS::SQS::Queue
   StarlingFeedItemWebhook:
     Type: AWS::Serverless::Function
     Properties:
@@ -25,16 +31,20 @@ Resources:
       Environment:
         Variables:
           PUBLIC_KEY: !Ref PublicKey
+          QUEUE_URL: !GetAtt StarlingVerifiedFeedItemQueue.QueueUrl
       Events:
         StarlingFeedItem:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /starling/feed-item
             Method: post
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: SQS
+    Connectors:
+      OutgoingQueueConnector:
+        Properties:
+          Destination:
+            Id: StarlingVerifiedFeedItemQueue
+          Permissions:
+            - Write
   SheetsWriter:
     Type: AWS::Serverless::Function
     Properties:
@@ -46,15 +56,55 @@ Resources:
       Environment:
         Variables:
           SPREADSHEET_ID: !Ref SpreadsheetId
-          GOOGLE_APPLICATION_CREDENTIALS: ./google_credentials.json
+          GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
+      Events:
+        FinanceTransaction:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FinancialTransactionQueue.Arn
+            BatchSize: 1
+    Connectors:
+      IncomingQueueConnector:
+        Properties:
+          Destination:
+            Id: FinancialTransactionQueue
+          Permissions:
+            - Read
+  StarlingFeedItemToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: starling_feed_item_to_transaction/
+      Handler: app.lambdaHandler
+      Runtime: nodejs20.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          QUEUE_URL: !GetAtt FinancialTransactionQueue.QueueUrl
+      Events:
+        VerifiedStarlingFeedItem:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt StarlingVerifiedFeedItemQueue.Arn
+            BatchSize: 1
+    Connectors:
+      OutgoingQueueConnector:
+        Properties:
+          Destination:
+            Id: FinancialTransactionQueue
+          Permissions:
+            - Write
+      IncomingQueueConnector:
+        Properties:
+          Destination:
+            Id: StarlingVerifiedFeedItemQueue
+          Permissions:
+            - Read
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  StarlingFeedItemApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
   StarlingFeedItemWebhook:
     Description: "Hello World Lambda Function ARN"
     Value: !GetAtt StarlingFeedItemWebhook.Arn

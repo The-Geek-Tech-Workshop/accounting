@@ -1,12 +1,12 @@
 {
-  "name": "starling_feed_item_webhook",
+  "name": "starling_feed_item_to_transaction",
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
   "author": "Andrew Todd",
   "dependencies": {
     "aws-sdk": "^2.1659.0",
-    "axios": ">=1.6.0"
+    "dateformat": "^5.0.3"
   },
   "scripts": {
     "test": "mocha tests/unit/"

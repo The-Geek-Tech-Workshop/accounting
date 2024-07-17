@@ -5,6 +5,7 @@ const PUBLIC_KEY = createPublicKey(
   `-----BEGIN PUBLIC KEY-----\n${process.env.PUBLIC_KEY}\n-----END PUBLIC KEY-----`
 );
 const ENCRYPTION_ALGORITHM = "RSA-SHA512";
+const QUEUE_URL = process.env.QUEUE_URL;
 
 /**
  *
@@ -19,27 +20,22 @@ const ENCRYPTION_ALGORITHM = "RSA-SHA512";
  *
  */
 
-export const lambdaHandler = async (event, context) => {
+export const lambdaHandler = async (event) => {
   const verified = verifyEvent(event);
-
-  console.log(`EVENT: ${JSON.stringify(event)}`);
 
   if (verified) {
     const sqs = new AWS.SQS();
-    const result = await sqs
+    await sqs
       .sendMessage({
         MessageBody: event.body,
+        QueueUrl: QUEUE_URL,
       })
       .promise();
-    console.log(`SQS Result: ${result}`);
   }
 
-  const response = verified
+  return verified
     ? {
-        statusCode: 200,
-        body: JSON.stringify({
-          feedItem: event.body,
-        }),
+        statusCode: 202,
       }
     : {
         statusCode: 400,
@@ -47,8 +43,6 @@ export const lambdaHandler = async (event, context) => {
           error: "Integrity of message signature could not be verified",
         }),
       };
-
-  return response;
 };
 
 const verifyEvent = (event) => {
