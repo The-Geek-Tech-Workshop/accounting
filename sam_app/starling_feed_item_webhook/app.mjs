@@ -1,4 +1,5 @@
 import { createPublicKey, verify } from "crypto";
+import AWS from "aws-sdk";
 
 const PUBLIC_KEY = createPublicKey(
   `-----BEGIN PUBLIC KEY-----\n${process.env.PUBLIC_KEY}\n-----END PUBLIC KEY-----`
@@ -22,6 +23,16 @@ export const lambdaHandler = async (event, context) => {
   const verified = verifyEvent(event);
 
   console.log(`EVENT: ${JSON.stringify(event)}`);
+
+  if (verified) {
+    const sqs = new AWS.SQS();
+    const result = await sqs
+      .sendMessage({
+        MessageBody: event.body,
+      })
+      .promise();
+    console.log(`SQS Result: ${result}`);
+  }
 
   const response = verified
     ? {

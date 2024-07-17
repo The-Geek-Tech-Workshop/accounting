@@ -1,5 +1,6 @@
 {
-  "transactionId": "STAR-12345",
+  "source": "STARLING",
+  "sourceTransactionId": "12345",
   "transactionDate": "01/01/2025",
   "creditedAccount": "GTW",
   "debitedAccount": "Equipment",

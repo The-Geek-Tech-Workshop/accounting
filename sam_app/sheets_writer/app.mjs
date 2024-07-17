@@ -63,7 +63,7 @@ export const lambdaHandler = async (event, context) => {
     },
   });
 
-  const result = await sheetsApi.spreadsheets.values.update({
+  await sheetsApi.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
     range: "Transactions!A3:I3",
     valueInputOption: "USER_ENTERED",
@@ -105,9 +105,7 @@ export const lambdaHandler = async (event, context) => {
     },
   });
 
-  const response = {
-    statusCode: result.status,
-    body: JSON.stringify(result),
+  return {
+    statusCode: 202,
   };
-  return response;
 };
