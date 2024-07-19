@@ -37,7 +37,7 @@ export const lambdaHandler = async (event) => {
         debitedAccount: debitedAccount,
         skuOrPurchaseId: "",
         amount: feedItem.amount.minorUnits / 100,
-        description: "",
+        description: feedItem.reference,
         who: feedItem.counterPartyName,
       }),
       QueueUrl: QUEUE_URL,
