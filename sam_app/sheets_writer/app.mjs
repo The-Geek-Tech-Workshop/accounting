@@ -8,6 +8,9 @@ const SCOPES = [
 
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
+const TRANSACTION_ID_METADATA_KEY = "transactionId";
+const NEW_ROW_NUMBER = 3;
+
 /**
  *
  * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
@@ -22,8 +25,8 @@ const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
  */
 
 export const lambdaHandler = async (event) => {
-  console.log(`EVENT: ${JSON.stringify(event)}`);
   const transaction = JSON.parse(event.Records[0].body);
+  const transactionId = `${transaction.source}-${transaction.sourceTransactionId}`;
 
   const auth = new GoogleAuth({ scopes: SCOPES });
   const client = await auth.getClient();
@@ -36,39 +39,65 @@ export const lambdaHandler = async (event) => {
   });
   const transactionsSheetId = sheetResult.data.sheets[0].properties.sheetId;
 
+  const existingTransactionResult =
+    await sheetsApi.spreadsheets.developerMetadata.search({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        dataFilters: [
+          {
+            developerMetadataLookup: {
+              metadataKey: TRANSACTION_ID_METADATA_KEY,
+              metadataValue: transactionId,
+            },
+          },
+        ],
+      },
+    });
+  const existingTransaction =
+    Object.keys(existingTransactionResult.data).length > 0
+      ? existingTransactionResult.data.matchedDeveloperMetadata[0]
+      : null;
+
+  const a1RangeRowNumber = existingTransaction
+    ? existingTransaction.developerMetadata.location.dimensionRange.endIndex
+    : NEW_ROW_NUMBER;
+  const a1Range = `Transactions!A${a1RangeRowNumber}:I${a1RangeRowNumber}`;
+
   const rowResult = await sheetsApi.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     valueRenderOption: "FORMULA",
-    range: "Transactions!A3:I3",
+    range: a1Range,
   });
 
   const existingRow = rowResult.data.values[0];
   const creditedAccountAssetLookupFunction = existingRow[2];
   const debitedAccountAssetLookupFunction = existingRow[4];
 
-  // Insert new row and then sort all rows by date column
-  await sheetsApi.spreadsheets.batchUpdate({
-    spreadsheetId: SPREADSHEET_ID,
-    resource: {
-      requests: [
-        {
-          insertDimension: {
-            range: {
-              sheetId: transactionsSheetId,
-              dimension: "ROWS",
-              startIndex: 2,
-              endIndex: 3,
+  if (!existingTransaction) {
+    // Insert new row
+    await sheetsApi.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [
+          {
+            insertDimension: {
+              range: {
+                sheetId: transactionsSheetId,
+                dimension: "ROWS",
+                startIndex: NEW_ROW_NUMBER - 1,
+                endIndex: NEW_ROW_NUMBER,
+              },
+              inheritFromBefore: true,
             },
-            inheritFromBefore: true,
           },
-        },
-      ],
-    },
-  });
+        ],
+      },
+    });
+  }
 
   await sheetsApi.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
-    range: "Transactions!A3:I3",
+    range: a1Range,
     valueInputOption: "USER_ENTERED",
     resource: {
       values: [
@@ -87,10 +116,29 @@ export const lambdaHandler = async (event) => {
     },
   });
 
+  const createDeveloperMetadataRequest = {
+    createDeveloperMetadata: {
+      developerMetadata: {
+        metadataKey: TRANSACTION_ID_METADATA_KEY,
+        metadataValue: transactionId,
+        location: {
+          dimensionRange: {
+            sheetId: transactionsSheetId,
+            dimension: "ROWS",
+            startIndex: NEW_ROW_NUMBER - 1,
+            endIndex: NEW_ROW_NUMBER,
+          },
+        },
+        visibility: "DOCUMENT",
+      },
+    },
+  };
+
   await sheetsApi.spreadsheets.batchUpdate({
     spreadsheetId: SPREADSHEET_ID,
     resource: {
       requests: [
+        ...(existingTransaction ? [] : [createDeveloperMetadataRequest]),
         {
           sortRange: {
             range: {
