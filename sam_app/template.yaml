@@ -16,6 +16,8 @@ Globals:
     Timeout: 10
 
 Resources:
+  StarlingEbayEnrichmentQueue:
+    Type: AWS::SQS::Queue
   FinancialTransactionQueue:
     Type: AWS::SQS::Queue
   StarlingVerifiedFeedItemQueue:
@@ -45,31 +47,6 @@ Resources:
             Id: StarlingVerifiedFeedItemQueue
           Permissions:
             - Write
-  SheetsWriter:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: sheets_writer/
-      Handler: app.lambdaHandler
-      Runtime: nodejs20.x
-      Architectures:
-        - x86_64
-      Environment:
-        Variables:
-          SPREADSHEET_ID: !Ref SpreadsheetId
-          GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
-      Events:
-        FinanceTransaction:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt FinancialTransactionQueue.Arn
-            BatchSize: 1
-    Connectors:
-      IncomingQueueConnector:
-        Properties:
-          Destination:
-            Id: FinancialTransactionQueue
-          Permissions:
-            - Read
   StarlingFeedItemToTransaction:
     Type: AWS::Serverless::Function
     Properties:
@@ -98,6 +75,61 @@ Resources:
         Properties:
           Destination:
             Id: StarlingVerifiedFeedItemQueue
+          Permissions:
+            - Read
+  StarlingEbayEnricher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay_starling_enricher/
+      Handler: app.lambdaHandler
+      Runtime: nodejs20.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          QUEUE_URL: !GetAtt FinancialTransactionQueue.QueueUrl
+      Events:
+        VerifiedStarlingFeedItem:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt StarlingEbayEnrichmentQueue.Arn
+            BatchSize: 1
+    Connectors:
+      OutgoingQueueConnector:
+        Properties:
+          Destination:
+            Id: FinancialTransactionQueue
+          Permissions:
+            - Write
+      IncomingQueueConnector:
+        Properties:
+          Destination:
+            Id: StarlingEbayEnrichmentQueue
+          Permissions:
+            - Read
+  SheetsWriter:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: sheets_writer/
+      Handler: app.lambdaHandler
+      Runtime: nodejs20.x
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          SPREADSHEET_ID: !Ref SpreadsheetId
+          GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
+      Events:
+        FinanceTransaction:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FinancialTransactionQueue.Arn
+            BatchSize: 1
+    Connectors:
+      IncomingQueueConnector:
+        Properties:
+          Destination:
+            Id: FinancialTransactionQueue
           Permissions:
             - Read
 
