@@ -58,6 +58,10 @@ export const lambdaHandler = async (event) => {
       ? existingTransactionResult.data.matchedDeveloperMetadata[0]
       : null;
 
+  if (existingTransaction) {
+    return;
+  }
+
   const a1RangeRowNumber = existingTransaction
     ? existingTransaction.developerMetadata.location.dimensionRange.endIndex
     : NEW_ROW_NUMBER;
@@ -73,27 +77,25 @@ export const lambdaHandler = async (event) => {
   const creditedAccountAssetLookupFunction = existingRow[2];
   const debitedAccountAssetLookupFunction = existingRow[4];
 
-  if (!existingTransaction) {
-    // Insert new row
-    await sheetsApi.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      resource: {
-        requests: [
-          {
-            insertDimension: {
-              range: {
-                sheetId: transactionsSheetId,
-                dimension: "ROWS",
-                startIndex: NEW_ROW_NUMBER - 1,
-                endIndex: NEW_ROW_NUMBER,
-              },
-              inheritFromBefore: true,
+  // Insert new row
+  await sheetsApi.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    resource: {
+      requests: [
+        {
+          insertDimension: {
+            range: {
+              sheetId: transactionsSheetId,
+              dimension: "ROWS",
+              startIndex: NEW_ROW_NUMBER - 1,
+              endIndex: NEW_ROW_NUMBER,
             },
+            inheritFromBefore: true,
           },
-        ],
-      },
-    });
-  }
+        },
+      ],
+    },
+  });
 
   await sheetsApi.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
