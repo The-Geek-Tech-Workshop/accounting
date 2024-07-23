@@ -1,20 +1,23 @@
 import AWS from "aws-sdk";
 import eBayApi from "ebay-api";
+import { readFile } from "fs/promises";
+
+const eBayAuth = JSON.parse(
+  await readFile(new URL("./ebay-auth.json", import.meta.url))
+);
 
 const QUEUE_URL = process.env.QUEUE_URL;
 const EBAY_CLIENT_ID = process.env.EBAY_CLIENT_ID;
 const EBAY_DEVELOPER_ID = process.env.EBAY_DEVELOPER_ID;
 const EBAY_CLIENT_SECRET = process.env.EBAY_CLIENT_SECRET;
-const EBAY_RUNAME = process.env.EBAY_RUNAME;
-const USE_EBAY_SANDBOX = process.env.USE_EBAY_SANDBOX;
 
 const ebayClient = new eBayApi({
   appId: EBAY_CLIENT_ID,
   certId: EBAY_CLIENT_SECRET,
-  sandbox: USE_EBAY_SANDBOX,
+  sandbox: false,
   devId: EBAY_DEVELOPER_ID,
   marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
-  ruName: EBAY_RUNAME,
+  authToken: eBayAuth.token,
 });
 
 /**
@@ -27,20 +30,23 @@ const ebayClient = new eBayApi({
  */
 
 export const lambdaHandler = async (event) => {
-  const transaction = JSON.parse(event.Records[0].body).content;
+  const transaction = JSON.parse(event.Records[0].body);
   const ebayOrderId = event.Records[0].attributes.eBayOrderId;
 
-  const ebayOrder = await ebayClient.trading.GetOrders({
-    OrderIdArray: [{ OrderId: ebayOrderId }],
+  const ebayOrderResponse = await ebayClient.trading.GetOrders({
+    OrderIDArray: [{ OrderID: ebayOrderId }],
   });
-  console.log(`ORDER: ${JSON.stringify(ebayOrder)}`);
+
+  const order = ebayOrderResponse.OrderArray.Order[0];
 
   const sqs = new AWS.SQS();
   await sqs
     .sendMessage({
-      MessageBody: JSON.stringify({ ...transaction,
-        
-       }),
+      MessageBody: JSON.stringify({
+        ...transaction,
+        description: order.TransactionArray.Transaction[0].Item.Title,
+        who: `eBay: ${order.SellerUserID}`,
+      }),
       QueueUrl: QUEUE_URL,
     })
     .promise();

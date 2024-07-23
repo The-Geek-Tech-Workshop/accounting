@@ -1,0 +1,10 @@
+{
+  "Records": [
+    {
+      "attributes": {
+        "eBayOrderId": "16-11831-93018"
+      },
+      "body": "{\"source\":\"STARLING\",\"sourceTransactionId\":\"12346\",\"transactionDate\":\"01/01/2025\",\"creditedAccount\":\"GTW\",\"debitedAccount\":\"Equipment\",\"skuOrPurchaseId\":\"\",\"amount\":2.9,\"description\":\"Awidget\",\"who\":\"WidgetsRUs\"}"
+    }
+  ]
+}

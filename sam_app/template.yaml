@@ -88,6 +88,9 @@ Resources:
       Environment:
         Variables:
           QUEUE_URL: !GetAtt FinancialTransactionQueue.QueueUrl
+          EBAY_CLIENT_ID: "AndrewTo-GTWAccou-PRD-8c1cfea6d-06bc563b"
+          EBAY_DEVELOPER_ID: "90557685-1b1f-4087-8971-944e551282e1"
+          EBAY_CLIENT_SECRET: "PRD-c1cfea6d8218-4ec6-4a57-9272-ad89"
       Events:
         VerifiedStarlingFeedItem:
           Type: SQS
