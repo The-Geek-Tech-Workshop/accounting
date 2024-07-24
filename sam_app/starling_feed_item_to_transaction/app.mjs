@@ -16,33 +16,35 @@ const QUEUE_URL = process.env.QUEUE_URL;
  */
 
 export const lambdaHandler = async (event) => {
-  const feedItem = JSON.parse(event.Records[0].body).content;
+  event.Records.forEach(async (record) => {
+    const feedItem = JSON.parse(record.body).content;
 
-  const transactionWasOutgoing = feedItem.direction === "OUT";
-  const creditedAccount = transactionWasOutgoing
-    ? STARLING_BANK_ACCOUNT_NAME
-    : "";
-  const debitedAccount = transactionWasOutgoing
-    ? ""
-    : STARLING_BANK_ACCOUNT_NAME;
+    const transactionWasOutgoing = feedItem.direction === "OUT";
+    const creditedAccount = transactionWasOutgoing
+      ? STARLING_BANK_ACCOUNT_NAME
+      : "";
+    const debitedAccount = transactionWasOutgoing
+      ? ""
+      : STARLING_BANK_ACCOUNT_NAME;
 
-  const sqs = new AWS.SQS();
-  await sqs
-    .sendMessage({
-      MessageBody: JSON.stringify({
-        source: STARLING_SOURCE,
-        sourceTransactionId: feedItem.feedItemUid,
-        transactionDate: toIsoDateString(feedItem.transactionTime),
-        creditedAccount: creditedAccount,
-        debitedAccount: debitedAccount,
-        skuOrPurchaseId: "",
-        amount: feedItem.amount.minorUnits / 100,
-        description: feedItem.reference,
-        who: feedItem.counterPartyName,
-      }),
-      QueueUrl: QUEUE_URL,
-    })
-    .promise();
+    const sqs = new AWS.SQS();
+    await sqs
+      .sendMessage({
+        MessageBody: JSON.stringify({
+          source: STARLING_SOURCE,
+          sourceTransactionId: feedItem.feedItemUid,
+          transactionDate: toIsoDateString(feedItem.transactionTime),
+          creditedAccount: creditedAccount,
+          debitedAccount: debitedAccount,
+          skuOrPurchaseId: "",
+          amount: feedItem.amount.minorUnits / 100,
+          description: feedItem.reference,
+          who: feedItem.counterPartyName,
+        }),
+        QueueUrl: QUEUE_URL,
+      })
+      .promise();
+  });
 };
 
 const toIsoDateString = (isoDateTimeString) =>

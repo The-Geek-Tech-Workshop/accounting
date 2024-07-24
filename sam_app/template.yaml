@@ -16,10 +16,8 @@ Globals:
     Timeout: 10
 
 Resources:
-  StarlingEbayEnrichmentQueue:
-    Type: AWS::SQS::Queue
-  FinancialTransactionQueue:
-    Type: AWS::SQS::Queue
+  FinancialTransactionTopic:
+    Type: AWS::SNS::Topic
   StarlingVerifiedFeedItemQueue:
     Type: AWS::SQS::Queue
   StarlingFeedItemWebhook:
@@ -36,7 +34,7 @@ Resources:
           QUEUE_URL: !GetAtt StarlingVerifiedFeedItemQueue.QueueUrl
       Events:
         StarlingFeedItem:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Type: Api
           Properties:
             Path: /starling/feed-item
             Method: post
@@ -65,10 +63,10 @@ Resources:
             Queue: !GetAtt StarlingVerifiedFeedItemQueue.Arn
             BatchSize: 1
     Connectors:
-      OutgoingQueueConnector:
+      OutgoingTopicConnector:
         Properties:
           Destination:
-            Id: FinancialTransactionQueue
+            Id: FinancialTransactionTopic
           Permissions:
             - Write
       IncomingQueueConnector:
@@ -90,18 +88,20 @@ Resources:
           QUEUE_URL: !GetAtt FinancialTransactionQueue.QueueUrl
           EBAY_CLIENT_ID: "AndrewTo-GTWAccou-PRD-8c1cfea6d-06bc563b"
           EBAY_DEVELOPER_ID: "90557685-1b1f-4087-8971-944e551282e1"
-          EBAY_CLIENT_SECRET: "PRD-c1cfea6d8218-4ec6-4a57-9272-ad89"
       Events:
-        VerifiedStarlingFeedItem:
-          Type: SQS
+        FinanceTransaction:
+          Type: SNS
           Properties:
-            Queue: !GetAtt StarlingEbayEnrichmentQueue.Arn
-            BatchSize: 1
+            Topic: !GetAtt FinancialTransactionTopic.Arn
+            SqsSubscription: true
+            FilterPolicyScope: MessageAttributes
+            FilterPolicy:
+              eBayOrderId: [{ "exists": true }]
     Connectors:
-      OutgoingQueueConnector:
+      OutgoingTopicConnector:
         Properties:
           Destination:
-            Id: FinancialTransactionQueue
+            Id: FinancialTransactionTopic
           Permissions:
             - Write
       IncomingQueueConnector:

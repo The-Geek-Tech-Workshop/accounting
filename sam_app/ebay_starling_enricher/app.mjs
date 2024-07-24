@@ -9,16 +9,19 @@ const eBayAuth = JSON.parse(
 const QUEUE_URL = process.env.QUEUE_URL;
 const EBAY_CLIENT_ID = process.env.EBAY_CLIENT_ID;
 const EBAY_DEVELOPER_ID = process.env.EBAY_DEVELOPER_ID;
-const EBAY_CLIENT_SECRET = process.env.EBAY_CLIENT_SECRET;
+
+const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 
 const ebayClient = new eBayApi({
   appId: EBAY_CLIENT_ID,
-  certId: EBAY_CLIENT_SECRET,
+  certId: eBayAuth.certId,
   sandbox: false,
   devId: EBAY_DEVELOPER_ID,
   marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
   authToken: eBayAuth.token,
 });
+
+const sqs = new AWS.SQS();
 
 /**
  *
@@ -30,24 +33,43 @@ const ebayClient = new eBayApi({
  */
 
 export const lambdaHandler = async (event) => {
-  const transaction = JSON.parse(event.Records[0].body);
-  const ebayOrderId = event.Records[0].attributes.eBayOrderId;
+  event.Records.forEach(async (record) => {
+    const transaction = JSON.parse(record.body);
+    const ebayOrderId = event.Records[0].attributes.eBayOrderId;
 
-  const ebayOrderResponse = await ebayClient.trading.GetOrders({
-    OrderIDArray: [{ OrderID: ebayOrderId }],
+    const ebayOrderResponse = await ebayClient.trading.GetOrders({
+      OrderIDArray: [{ OrderID: ebayOrderId }],
+    });
+
+    const order = ebayOrderResponse.OrderArray.Order[0];
+    const item = order.TransactionArray.Transaction[0];
+
+    await sqs
+      .sendMessage({
+        MessageBody: JSON.stringify({
+          ...transaction,
+          amount: item.TransactionPrice.value,
+          description: item.Item.Title,
+          who: `eBay: ${order.SellerUserID}`,
+        }),
+        QueueUrl: QUEUE_URL,
+      })
+      .promise();
+
+    if (order.ShippingServiceSelected.ShippingServiceCost.value > 0) {
+      await sqs
+        .sendMessage({
+          MessageBody: JSON.stringify({
+            ...transaction,
+            sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
+            debitedAccount: INWARD_SHIPPING_ACCOUNT_NAME,
+            amount: order.ShippingServiceSelected.ShippingServiceCost.value,
+            description: order.ShippingServiceSelected.ShippingService,
+            who: `eBay: ${order.SellerUserID}`,
+          }),
+          QueueUrl: QUEUE_URL,
+        })
+        .promise();
+    }
   });
-
-  const order = ebayOrderResponse.OrderArray.Order[0];
-
-  const sqs = new AWS.SQS();
-  await sqs
-    .sendMessage({
-      MessageBody: JSON.stringify({
-        ...transaction,
-        description: order.TransactionArray.Transaction[0].Item.Title,
-        who: `eBay: ${order.SellerUserID}`,
-      }),
-      QueueUrl: QUEUE_URL,
-    })
-    .promise();
 };
