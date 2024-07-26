@@ -30,7 +30,6 @@ const sheetsApi = google.sheets({ version: "v4", auth: client });
 
 export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
-    console.log(JSON.stringify(record));
     const transaction = JSON.parse(record.body);
     const transactionId = `${transaction.source}-${transaction.sourceTransactionId}`;
 

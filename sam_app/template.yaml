@@ -16,8 +16,53 @@ Globals:
     Timeout: 10
 
 Resources:
+  DeliveryStatusLogger:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: DeliveryStatusLoggerPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:*
+                Resource: "*"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sns.amazonaws.com
+            Action:
+              - sts:AssumeRole
   AccountingEntryTopic:
     Type: AWS::SNS::Topic
+    Properties:
+      DeliveryStatusLogging:
+        - Protocol: sqs
+          SuccessFeedbackSampleRate: "100"
+          SuccessFeedbackRoleArn: !GetAtt DeliveryStatusLogger.Arn
+          FailureFeedbackRoleArn: !GetAtt DeliveryStatusLogger.Arn
+    Connectors:
+      SheetsWriterQueueConnector:
+        Properties:
+          Destination:
+            Id: SheetsWriterQueue
+          Permissions:
+            - Write
+  SheetsWriterQueue:
+    Type: AWS::SQS::Queue
+  SheetsWriterAccountingEntrySubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref AccountingEntryTopic
+      Endpoint: !GetAtt SheetsWriterQueue.Arn
+      RawMessageDelivery: true
+      FilterPolicyScope: MessageAttributes
+      FilterPolicy: { "eBayOrderId": [{ "exists": false }] }
   StarlingVerifiedFeedItemQueue:
     Type: AWS::SQS::Queue
   StarlingFeedItemWebhook:
@@ -116,13 +161,17 @@ Resources:
           SPREADSHEET_ID: !Ref SpreadsheetId
           GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
       Events:
-        AccountingEntry:
-          Type: SNS
+        AccountsEntry:
+          Type: SQS
           Properties:
-            Topic: !GetAtt AccountingEntryTopic.TopicArn
-            SqsSubscription: true
-            FilterPolicyScope: MessageAttributes
-            FilterPolicy: { "eBayOrderId" : [{ "exists": false }] }
+            Queue: !GetAtt SheetsWriterQueue.Arn
+    Connectors:
+      IncomingQueueConnector:
+        Properties:
+          Destination:
+            Id: SheetsWriterQueue
+          Permissions:
+            - Read
 
 Outputs:
   StarlingFeedItemWebhook:

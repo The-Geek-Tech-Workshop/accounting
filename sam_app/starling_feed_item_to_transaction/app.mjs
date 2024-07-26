@@ -22,6 +22,7 @@ export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
     const feedItem = JSON.parse(record.body).content;
 
+    const transactionId = `${STARLING_SOURCE}-${feedItem.feedItemUid}`;
     const transactionWasOutgoing = feedItem.direction === "OUT";
     const creditedAccount = transactionWasOutgoing
       ? STARLING_BANK_ACCOUNT_NAME
@@ -56,13 +57,14 @@ export const lambdaHandler = async (event) => {
         MessageAttributes: {
           transactionId: {
             DataType: "String",
-            StringValue: `${STARLING_SOURCE}-${feedItem.feedItemUid}`,
+            StringValue: transactionId,
           },
           ...additionalMessageAttributes,
         },
         TopicArn: TOPIC_ARN,
       })
       .promise();
+    console.log(`Transaction ${transactionId} message sent`);
   }
 };
 
