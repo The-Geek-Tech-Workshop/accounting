@@ -4,8 +4,11 @@ import AWS from "aws-sdk";
 const ISO_DATE_MASK = "isoDate";
 const STARLING_BANK_ACCOUNT_NAME = "GTW";
 const STARLING_SOURCE = "STARLING";
-const QUEUE_URL = process.env.QUEUE_URL;
+const TOPIC_ARN = process.env.TOPIC_ARN;
+const EBAY_STARLING_UID = "ae3f1752-1bf2-4bf5-8a03-2fad3dc3d468";
 
+const ebayOrderIdRegex = /^eBay .\*(?<orderId>.+)$/gm;
+const sns = new AWS.SNS();
 /**
  *
  * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
@@ -16,7 +19,7 @@ const QUEUE_URL = process.env.QUEUE_URL;
  */
 
 export const lambdaHandler = async (event) => {
-  event.Records.forEach(async (record) => {
+  for (const record of event.Records) {
     const feedItem = JSON.parse(record.body).content;
 
     const transactionWasOutgoing = feedItem.direction === "OUT";
@@ -27,10 +30,19 @@ export const lambdaHandler = async (event) => {
       ? ""
       : STARLING_BANK_ACCOUNT_NAME;
 
-    const sqs = new AWS.SQS();
-    await sqs
-      .sendMessage({
-        MessageBody: JSON.stringify({
+    const additionalMessageAttributes =
+      transactionWasOutgoing && feedItem.counterPartyUid === EBAY_STARLING_UID
+        ? {
+            ebayOrderId: {
+              DataType: "String",
+              StringValue: ebayOrderIdRegex.match(feedItem.reference).orderId,
+            },
+          }
+        : {};
+
+    await sns
+      .publish({
+        Message: JSON.stringify({
           source: STARLING_SOURCE,
           sourceTransactionId: feedItem.feedItemUid,
           transactionDate: toIsoDateString(feedItem.transactionTime),
@@ -41,10 +53,17 @@ export const lambdaHandler = async (event) => {
           description: feedItem.reference,
           who: feedItem.counterPartyName,
         }),
-        QueueUrl: QUEUE_URL,
+        MessageAttributes: {
+          transactionId: {
+            DataType: "String",
+            StringValue: `${STARLING_SOURCE}-${feedItem.feedItemUid}`,
+          },
+          ...additionalMessageAttributes,
+        },
+        TopicArn: TOPIC_ARN,
       })
       .promise();
-  });
+  }
 };
 
 const toIsoDateString = (isoDateTimeString) =>

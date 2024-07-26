@@ -29,8 +29,9 @@ const sheetsApi = google.sheets({ version: "v4", auth: client });
  */
 
 export const lambdaHandler = async (event) => {
-  event.Records.forEach(async (record) => {
-    const transaction = JSON.parse(record[0].body);
+  for (const record of event.Records) {
+    console.log(JSON.stringify(record));
+    const transaction = JSON.parse(record.body);
     const transactionId = `${transaction.source}-${transaction.sourceTransactionId}`;
 
     const sheetResult = await sheetsApi.spreadsheets.get({
@@ -59,7 +60,8 @@ export const lambdaHandler = async (event) => {
         : null;
 
     if (existingTransaction) {
-      return;
+      console.log(`Transaction ${transactionId} already exists. Skipping...`);
+      continue;
     }
 
     const a1RangeRowNumber = existingTransaction
@@ -157,5 +159,5 @@ export const lambdaHandler = async (event) => {
         ],
       },
     });
-  });
+  }
 };

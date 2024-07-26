@@ -1,7 +1,7 @@
 {
   "Records": [
     {
-      "body": "{\"source\":\"STARLING\",\"sourceTransactionId\":\"12346\",\"transactionDate\":\"01/01/2025\",\"creditedAccount\":\"GTW\",\"debitedAccount\":\"Equipment\",\"skuOrPurchaseId\":\"\",\"amount\":2.9,\"description\":\"Awidget\",\"who\":\"WidgetsRUs\"}"
+      "body": "{\"source\":\"STARLING\",\"sourceTransactionId\":\"12347\",\"transactionDate\":\"01/01/2025\",\"creditedAccount\":\"GTW\",\"debitedAccount\":\"Equipment\",\"skuOrPurchaseId\":\"\",\"amount\":2.9,\"description\":\"Awidget\",\"who\":\"WidgetsRUs\"}"
     }
   ]
 }

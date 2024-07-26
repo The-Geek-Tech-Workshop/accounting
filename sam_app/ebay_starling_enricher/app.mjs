@@ -6,7 +6,7 @@ const eBayAuth = JSON.parse(
   await readFile(new URL("./ebay-auth.json", import.meta.url))
 );
 
-const QUEUE_URL = process.env.QUEUE_URL;
+const TOPIC_ARN = process.env.TOPIC_ARN;
 const EBAY_CLIENT_ID = process.env.EBAY_CLIENT_ID;
 const EBAY_DEVELOPER_ID = process.env.EBAY_DEVELOPER_ID;
 
@@ -21,7 +21,7 @@ const ebayClient = new eBayApi({
   authToken: eBayAuth.token,
 });
 
-const sqs = new AWS.SQS();
+const sns = new AWS.SNS();
 
 /**
  *
@@ -33,9 +33,9 @@ const sqs = new AWS.SQS();
  */
 
 export const lambdaHandler = async (event) => {
-  event.Records.forEach(async (record) => {
+  for (const record of event.Records) {
     const transaction = JSON.parse(record.body);
-    const ebayOrderId = event.Records[0].attributes.eBayOrderId;
+    const ebayOrderId = record.attributes.eBayOrderId;
 
     const ebayOrderResponse = await ebayClient.trading.GetOrders({
       OrderIDArray: [{ OrderID: ebayOrderId }],
@@ -44,22 +44,22 @@ export const lambdaHandler = async (event) => {
     const order = ebayOrderResponse.OrderArray.Order[0];
     const item = order.TransactionArray.Transaction[0];
 
-    await sqs
-      .sendMessage({
-        MessageBody: JSON.stringify({
+    await sns
+      .publish({
+        Message: JSON.stringify({
           ...transaction,
           amount: item.TransactionPrice.value,
           description: item.Item.Title,
           who: `eBay: ${order.SellerUserID}`,
         }),
-        QueueUrl: QUEUE_URL,
+        TopicArn: TOPIC_ARN,
       })
       .promise();
 
     if (order.ShippingServiceSelected.ShippingServiceCost.value > 0) {
-      await sqs
-        .sendMessage({
-          MessageBody: JSON.stringify({
+      await sns
+        .publish({
+          Message: JSON.stringify({
             ...transaction,
             sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
             debitedAccount: INWARD_SHIPPING_ACCOUNT_NAME,
@@ -67,9 +67,9 @@ export const lambdaHandler = async (event) => {
             description: order.ShippingServiceSelected.ShippingService,
             who: `eBay: ${order.SellerUserID}`,
           }),
-          QueueUrl: QUEUE_URL,
+          TopicArn: TOPIC_ARN,
         })
         .promise();
     }
-  });
+  }
 };

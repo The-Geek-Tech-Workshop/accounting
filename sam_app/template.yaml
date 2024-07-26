@@ -16,7 +16,7 @@ Globals:
     Timeout: 10
 
 Resources:
-  FinancialTransactionTopic:
+  AccountingEntryTopic:
     Type: AWS::SNS::Topic
   StarlingVerifiedFeedItemQueue:
     Type: AWS::SQS::Queue
@@ -55,18 +55,17 @@ Resources:
         - x86_64
       Environment:
         Variables:
-          QUEUE_URL: !GetAtt FinancialTransactionQueue.QueueUrl
+          TOPIC_ARN: !GetAtt AccountingEntryTopic.TopicArn
       Events:
         VerifiedStarlingFeedItem:
           Type: SQS
           Properties:
             Queue: !GetAtt StarlingVerifiedFeedItemQueue.Arn
-            BatchSize: 1
     Connectors:
       OutgoingTopicConnector:
         Properties:
           Destination:
-            Id: FinancialTransactionTopic
+            Id: AccountingEntryTopic
           Permissions:
             - Write
       IncomingQueueConnector:
@@ -85,14 +84,14 @@ Resources:
         - x86_64
       Environment:
         Variables:
-          QUEUE_URL: !GetAtt FinancialTransactionQueue.QueueUrl
+          TOPIC_ARN: !GetAtt AccountingEntryTopic.TopicArn
           EBAY_CLIENT_ID: "AndrewTo-GTWAccou-PRD-8c1cfea6d-06bc563b"
           EBAY_DEVELOPER_ID: "90557685-1b1f-4087-8971-944e551282e1"
       Events:
-        FinanceTransaction:
+        AccountingEntry:
           Type: SNS
           Properties:
-            Topic: !GetAtt FinancialTransactionTopic.Arn
+            Topic: !GetAtt AccountingEntryTopic.TopicArn
             SqsSubscription: true
             FilterPolicyScope: MessageAttributes
             FilterPolicy:
@@ -101,15 +100,9 @@ Resources:
       OutgoingTopicConnector:
         Properties:
           Destination:
-            Id: FinancialTransactionTopic
+            Id: AccountingEntryTopic
           Permissions:
             - Write
-      IncomingQueueConnector:
-        Properties:
-          Destination:
-            Id: StarlingEbayEnrichmentQueue
-          Permissions:
-            - Read
   SheetsWriter:
     Type: AWS::Serverless::Function
     Properties:
@@ -123,23 +116,15 @@ Resources:
           SPREADSHEET_ID: !Ref SpreadsheetId
           GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
       Events:
-        FinanceTransaction:
-          Type: SQS
+        AccountingEntry:
+          Type: SNS
           Properties:
-            Queue: !GetAtt FinancialTransactionQueue.Arn
-            BatchSize: 1
-    Connectors:
-      IncomingQueueConnector:
-        Properties:
-          Destination:
-            Id: FinancialTransactionQueue
-          Permissions:
-            - Read
+            Topic: !GetAtt AccountingEntryTopic.TopicArn
+            SqsSubscription: true
+            FilterPolicyScope: MessageAttributes
+            FilterPolicy: { "eBayOrderId" : [{ "exists": false }] }
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   StarlingFeedItemWebhook:
-    Description: "Hello World Lambda Function ARN"
+    Description: "Starling ingress Function ARN"
     Value: !GetAtt StarlingFeedItemWebhook.Arn
