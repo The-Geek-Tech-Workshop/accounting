@@ -4,8 +4,11 @@ import AWS from "aws-sdk";
 const ISO_DATE_MASK = "isoDate";
 const STARLING_BANK_ACCOUNT_NAME = "GTW";
 const STARLING_SOURCE = "STARLING";
-const QUEUE_URL = process.env.QUEUE_URL;
+const TOPIC_ARN = process.env.TOPIC_ARN;
+const EBAY_STARLING_UID = "ae3f1752-1bf2-4bf5-8a03-2fad3dc3d468";
 
+const ebayOrderIdRegex = /^eBay .\*(?<orderId>.+)$/gm;
+const sns = new AWS.SNS();
 /**
  *
  * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
@@ -16,33 +19,53 @@ const QUEUE_URL = process.env.QUEUE_URL;
  */
 
 export const lambdaHandler = async (event) => {
-  const feedItem = JSON.parse(event.Records[0].body).content;
+  for (const record of event.Records) {
+    const feedItem = JSON.parse(record.body).content;
 
-  const transactionWasOutgoing = feedItem.direction === "OUT";
-  const creditedAccount = transactionWasOutgoing
-    ? STARLING_BANK_ACCOUNT_NAME
-    : "";
-  const debitedAccount = transactionWasOutgoing
-    ? ""
-    : STARLING_BANK_ACCOUNT_NAME;
+    const transactionId = `${STARLING_SOURCE}-${feedItem.feedItemUid}`;
+    const transactionWasOutgoing = feedItem.direction === "OUT";
+    const creditedAccount = transactionWasOutgoing
+      ? STARLING_BANK_ACCOUNT_NAME
+      : "";
+    const debitedAccount = transactionWasOutgoing
+      ? ""
+      : STARLING_BANK_ACCOUNT_NAME;
 
-  const sqs = new AWS.SQS();
-  await sqs
-    .sendMessage({
-      MessageBody: JSON.stringify({
-        source: STARLING_SOURCE,
-        sourceTransactionId: feedItem.feedItemUid,
-        transactionDate: toIsoDateString(feedItem.transactionTime),
-        creditedAccount: creditedAccount,
-        debitedAccount: debitedAccount,
-        skuOrPurchaseId: "",
-        amount: feedItem.amount.minorUnits / 100,
-        description: feedItem.reference,
-        who: feedItem.counterPartyName,
-      }),
-      QueueUrl: QUEUE_URL,
-    })
-    .promise();
+    const additionalMessageAttributes =
+      transactionWasOutgoing && feedItem.counterPartyUid === EBAY_STARLING_UID
+        ? {
+            ebayOrderId: {
+              DataType: "String",
+              StringValue: ebayOrderIdRegex.match(feedItem.reference).orderId,
+            },
+          }
+        : {};
+
+    await sns
+      .publish({
+        Message: JSON.stringify({
+          source: STARLING_SOURCE,
+          sourceTransactionId: feedItem.feedItemUid,
+          transactionDate: toIsoDateString(feedItem.transactionTime),
+          creditedAccount: creditedAccount,
+          debitedAccount: debitedAccount,
+          skuOrPurchaseId: "",
+          amount: feedItem.amount.minorUnits / 100,
+          description: feedItem.reference,
+          who: feedItem.counterPartyName,
+        }),
+        MessageAttributes: {
+          transactionId: {
+            DataType: "String",
+            StringValue: transactionId,
+          },
+          ...additionalMessageAttributes,
+        },
+        TopicArn: TOPIC_ARN,
+      })
+      .promise();
+    console.log(`Transaction ${transactionId} message sent`);
+  }
 };
 
 const toIsoDateString = (isoDateTimeString) =>

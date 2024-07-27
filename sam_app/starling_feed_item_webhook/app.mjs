@@ -21,6 +21,8 @@ const QUEUE_URL = process.env.QUEUE_URL;
  */
 
 export const lambdaHandler = async (event) => {
+  console.log(JSON.stringify(event));
+
   const verified = verifyEvent(event);
 
   if (verified) {
@@ -31,6 +33,8 @@ export const lambdaHandler = async (event) => {
         QueueUrl: QUEUE_URL,
       })
       .promise();
+  } else {
+    console.error("Message verification failed");
   }
 
   return verified
