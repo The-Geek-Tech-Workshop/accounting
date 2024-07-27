@@ -14,6 +14,10 @@ Parameters:
 Globals:
   Function:
     Timeout: 10
+    Handler: app.lambdaHandler
+    Runtime: nodejs20.x
+    Architectures:
+      - x86_64
 
 Resources:
   DeliveryStatusLogger:
@@ -52,6 +56,14 @@ Resources:
             Id: SheetsWriterQueue
           Permissions:
             - Write
+      EbayEnricherQueueConnector:
+        Properties:
+          Destination:
+            Id: EbayEnricherQueue
+          Permissions:
+            - Write
+  EbayEnricherQueue:
+    Type: AWS::SQS::Queue
   SheetsWriterQueue:
     Type: AWS::SQS::Queue
   SheetsWriterAccountingEntrySubscription:
@@ -63,16 +75,21 @@ Resources:
       RawMessageDelivery: true
       FilterPolicyScope: MessageAttributes
       FilterPolicy: { "eBayOrderId": [{ "exists": false }] }
+  EbayEnricherAccountingEntrySubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref AccountingEntryTopic
+      Endpoint: !GetAtt EbayEnricherQueue.Arn
+      RawMessageDelivery: true
+      FilterPolicyScope: MessageAttributes
+      FilterPolicy: { "eBayOrderId": [{ "exists": true }] }
   StarlingVerifiedFeedItemQueue:
     Type: AWS::SQS::Queue
   StarlingFeedItemWebhook:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: starling_feed_item_webhook/
-      Handler: app.lambdaHandler
-      Runtime: nodejs20.x
-      Architectures:
-        - x86_64
       Environment:
         Variables:
           PUBLIC_KEY: !Ref PublicKey
@@ -94,10 +111,6 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: starling_feed_item_to_transaction/
-      Handler: app.lambdaHandler
-      Runtime: nodejs20.x
-      Architectures:
-        - x86_64
       Environment:
         Variables:
           TOPIC_ARN: !GetAtt AccountingEntryTopic.TopicArn
@@ -123,39 +136,33 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ebay_starling_enricher/
-      Handler: app.lambdaHandler
-      Runtime: nodejs20.x
-      Architectures:
-        - x86_64
       Environment:
         Variables:
-          TOPIC_ARN: !GetAtt AccountingEntryTopic.TopicArn
+          QUEUE_URL: !GetAtt SheetsWriterQueue.QueueUrl
           EBAY_CLIENT_ID: "AndrewTo-GTWAccou-PRD-8c1cfea6d-06bc563b"
           EBAY_DEVELOPER_ID: "90557685-1b1f-4087-8971-944e551282e1"
       Events:
-        AccountingEntry:
-          Type: SNS
+        AccountsEntry:
+          Type: SQS
           Properties:
-            Topic: !GetAtt AccountingEntryTopic.TopicArn
-            SqsSubscription: true
-            FilterPolicyScope: MessageAttributes
-            FilterPolicy:
-              eBayOrderId: [{ "exists": true }]
+            Queue: !GetAtt EbayEnricherQueue.Arn
     Connectors:
-      OutgoingTopicConnector:
+      IncomingQueueConnector:
         Properties:
           Destination:
-            Id: AccountingEntryTopic
+            Id: EbayEnricherQueue
+          Permissions:
+            - Read
+      OutgoingQueueConnector:
+        Properties:
+          Destination:
+            Id: SheetsWriterQueue
           Permissions:
             - Write
   SheetsWriter:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: sheets_writer/
-      Handler: app.lambdaHandler
-      Runtime: nodejs20.x
-      Architectures:
-        - x86_64
       Environment:
         Variables:
           SPREADSHEET_ID: !Ref SpreadsheetId

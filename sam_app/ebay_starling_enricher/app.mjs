@@ -6,7 +6,7 @@ const eBayAuth = JSON.parse(
   await readFile(new URL("./ebay-auth.json", import.meta.url))
 );
 
-const TOPIC_ARN = process.env.TOPIC_ARN;
+const QUEUE_URL = process.env.QUEUE_URL;
 const EBAY_CLIENT_ID = process.env.EBAY_CLIENT_ID;
 const EBAY_DEVELOPER_ID = process.env.EBAY_DEVELOPER_ID;
 
@@ -21,7 +21,7 @@ const ebayClient = new eBayApi({
   authToken: eBayAuth.token,
 });
 
-const sns = new AWS.SNS();
+const sqs = new AWS.SQS();
 
 /**
  *
@@ -43,33 +43,41 @@ export const lambdaHandler = async (event) => {
 
     const order = ebayOrderResponse.OrderArray.Order[0];
     const item = order.TransactionArray.Transaction[0];
+    const who = `eBay: ${order.SellerUserID}`;
 
-    await sns
-      .publish({
-        Message: JSON.stringify({
-          ...transaction,
-          amount: item.TransactionPrice.value,
-          description: item.Item.Title,
-          who: `eBay: ${order.SellerUserID}`,
-        }),
-        TopicArn: TOPIC_ARN,
+    const additionalMessages =
+      order.ShippingServiceSelected.ShippingServiceCost.value > 0
+        ? [
+            {
+              Id: "shipping",
+              MessageBody: JSON.stringify({
+                ...transaction,
+                sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
+                debitedAccount: INWARD_SHIPPING_ACCOUNT_NAME,
+                amount: order.ShippingServiceSelected.ShippingServiceCost.value,
+                description: order.ShippingServiceSelected.ShippingService,
+                who: who,
+              }),
+            },
+          ]
+        : [];
+    console.log(QUEUE_URL);
+    await sqs
+      .sendMessageBatch({
+        Entries: [
+          {
+            Id: "item",
+            MessageBody: JSON.stringify({
+              ...transaction,
+              amount: item.TransactionPrice.value,
+              description: item.Item.Title,
+              who: who,
+            }),
+          },
+          ...additionalMessages,
+        ],
+        QueueUrl: QUEUE_URL,
       })
       .promise();
-
-    if (order.ShippingServiceSelected.ShippingServiceCost.value > 0) {
-      await sns
-        .publish({
-          Message: JSON.stringify({
-            ...transaction,
-            sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
-            debitedAccount: INWARD_SHIPPING_ACCOUNT_NAME,
-            amount: order.ShippingServiceSelected.ShippingServiceCost.value,
-            description: order.ShippingServiceSelected.ShippingService,
-            who: `eBay: ${order.SellerUserID}`,
-          }),
-          TopicArn: TOPIC_ARN,
-        })
-        .promise();
-    }
   }
 };
