@@ -53,6 +53,7 @@ export const lambdaHandler = async (event) => {
           ],
         },
       });
+    console.log(`MATCH: ${JSON.stringify(existingTransactionResult)}`);
     const existingTransaction =
       Object.keys(existingTransactionResult.data).length > 0
         ? existingTransactionResult.data.matchedDeveloperMetadata[0]
