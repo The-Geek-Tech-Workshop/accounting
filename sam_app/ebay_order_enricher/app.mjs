@@ -23,15 +23,6 @@ const ebayClient = new eBayApi({
 
 const sqs = new AWS.SQS();
 
-/**
- *
- * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
- * @param {Object} event - API Gateway Lambda Proxy Input Format
- *
- * Context doc: https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-context.html
- * @param {Object} context
- */
-
 export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
     const transaction = JSON.parse(record.body);
@@ -61,7 +52,6 @@ export const lambdaHandler = async (event) => {
             },
           ]
         : [];
-    console.log(QUEUE_URL);
     await sqs
       .sendMessageBatch({
         Entries: [

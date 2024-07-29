@@ -1,5 +1,5 @@
 {
-  "name": "ebay_starling_enricher",
+  "name": "ebay_payout_enricher",
   "version": "1.0.0",
   "description": "",
   "main": "app.js",

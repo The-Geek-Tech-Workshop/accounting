@@ -46,7 +46,7 @@ Resources:
     Properties:
       DeliveryStatusLogging:
         - Protocol: sqs
-          SuccessFeedbackSampleRate: "100"
+          SuccessFeedbackSampleRate: "0"
           SuccessFeedbackRoleArn: !GetAtt DeliveryStatusLogger.Arn
           FailureFeedbackRoleArn: !GetAtt DeliveryStatusLogger.Arn
     Connectors:
@@ -56,13 +56,21 @@ Resources:
             Id: SheetsWriterQueue
           Permissions:
             - Write
-      EbayEnricherQueueConnector:
+      EbayOrderEnricherQueueConnector:
         Properties:
           Destination:
-            Id: EbayEnricherQueue
+            Id: EbayOrderEnricherQueue
           Permissions:
             - Write
-  EbayEnricherQueue:
+      EbayPayoutEnricherQueueConnector:
+        Properties:
+          Destination:
+            Id: EbayPayoutEnricherQueue
+          Permissions:
+            - Write
+  EbayOrderEnricherQueue:
+    Type: AWS::SQS::Queue
+  EbayPayoutEnricherQueue:
     Type: AWS::SQS::Queue
   SheetsWriterQueue:
     Type: AWS::SQS::Queue
@@ -75,15 +83,24 @@ Resources:
       RawMessageDelivery: true
       FilterPolicyScope: MessageAttributes
       FilterPolicy: { "eBayOrderId": [{ "exists": false }] }
-  EbayEnricherAccountingEntrySubscription:
+  EbayOrderEnricherAccountingEntrySubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: sqs
       TopicArn: !Ref AccountingEntryTopic
-      Endpoint: !GetAtt EbayEnricherQueue.Arn
+      Endpoint: !GetAtt EbayOrderEnricherQueue.Arn
       RawMessageDelivery: true
       FilterPolicyScope: MessageAttributes
       FilterPolicy: { "eBayOrderId": [{ "exists": true }] }
+  EbayPayoutEnricherAccountingEntrySubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sqs
+      TopicArn: !Ref AccountingEntryTopic
+      Endpoint: !GetAtt EbayPayoutEnricherQueue.Arn
+      RawMessageDelivery: true
+      FilterPolicyScope: MessageAttributes
+      FilterPolicy: { "eBayPayoutId": [{ "exists": true }] }
   StarlingVerifiedFeedItemQueue:
     Type: AWS::SQS::Queue
   StarlingFeedItemWebhook:
@@ -132,10 +149,10 @@ Resources:
             Id: StarlingVerifiedFeedItemQueue
           Permissions:
             - Read
-  StarlingEbayEnricher:
+  StarlingEbayOrderEnricher:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ebay_starling_enricher/
+      CodeUri: ebay_order_enricher/
       Environment:
         Variables:
           QUEUE_URL: !GetAtt SheetsWriterQueue.QueueUrl
@@ -145,12 +162,39 @@ Resources:
         AccountsEntry:
           Type: SQS
           Properties:
-            Queue: !GetAtt EbayEnricherQueue.Arn
+            Queue: !GetAtt EbayOrderEnricherQueue.Arn
     Connectors:
       IncomingQueueConnector:
         Properties:
           Destination:
-            Id: EbayEnricherQueue
+            Id: EbayOrderEnricherQueue
+          Permissions:
+            - Read
+      OutgoingQueueConnector:
+        Properties:
+          Destination:
+            Id: SheetsWriterQueue
+          Permissions:
+            - Write
+  StarlingEbayPayoutEnricher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay_payout_enricher/
+      Environment:
+        Variables:
+          QUEUE_URL: !GetAtt SheetsWriterQueue.QueueUrl
+          EBAY_CLIENT_ID: "AndrewTo-GTWAccou-PRD-8c1cfea6d-06bc563b"
+          EBAY_DEVELOPER_ID: "90557685-1b1f-4087-8971-944e551282e1"
+      Events:
+        AccountsEntry:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EbayPayoutEnricherQueue.Arn
+    Connectors:
+      IncomingQueueConnector:
+        Properties:
+          Destination:
+            Id: EbayPayoutEnricherQueue
           Permissions:
             - Read
       OutgoingQueueConnector:
