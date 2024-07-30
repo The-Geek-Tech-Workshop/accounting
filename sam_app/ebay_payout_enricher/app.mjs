@@ -10,7 +10,6 @@ const eBayAuth = JSON.parse(
 const ISO_DATE_MASK = "isoDate";
 const QUEUE_URL = process.env.QUEUE_URL;
 
-const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 const ACCOUNTING_SOURCE__EBAY = "EBAY";
 const ACCOUNT_NAME__SALES = "Sales";
 const ACCOUNT_NAME__EBAY = "eBay (GTW)";
@@ -57,11 +56,11 @@ export const lambdaHandler = async (event) => {
       await ebayClient.sell.finances.sign.getTransactions({
         filter: `payoutId:{${ebayPayoutId}}`,
       });
-    const messages = eBayTransactionsResponse.transactions.reduce(
-      (messagesSoFar, ebayTransaction) => {
+    const messages = await eBayTransactionsResponse.transactions.reduce(
+      async (messagesSoFar, ebayTransaction) => {
         const newMessages =
           ebayTransaction.transactionType === EBAY_TRANSACTION_TYPE__SALE
-            ? extractSaleTransactions(ebayTransaction)
+            ? await extractSaleTransactions(ebayTransaction)
             : [];
         return [...messagesSoFar, ...newMessages];
       },
@@ -73,7 +72,7 @@ export const lambdaHandler = async (event) => {
         },
       ]
     );
-    // console.log(JSON.stringify(messages));
+    console.log(JSON.stringify(messages));
     await sqs
       .sendMessageBatch({
         Entries: messages.map((message) => {
@@ -87,7 +86,13 @@ export const lambdaHandler = async (event) => {
       .promise();
   }
 };
-const extractSaleTransactions = (ebayTransaction) => {
+const extractSaleTransactions = async (ebayTransaction) => {
+  const ebayOrderResponse = await ebayClient.trading.GetOrders({
+    OrderIDArray: [{ OrderID: ebayTransaction.orderId }],
+  });
+  const order = ebayOrderResponse.OrderArray.Order[0];
+  const item = order.TransactionArray.Transaction[0].Item;
+
   return ebayTransaction.orderLineItems.reduce((messages, lineItem) => {
     const baseSourceTransactionId = `${ebayTransaction.transactionId}-${lineItem.lineItemId}`;
     const transactionDate = toIsoDateString(ebayTransaction.transactionDate);
@@ -99,9 +104,9 @@ const extractSaleTransactions = (ebayTransaction) => {
         transactionDate: transactionDate,
         creditedAccount: ACCOUNT_NAME__SALES,
         debitedAccount: ACCOUNT_NAME__EBAY,
-        skuOrPurchaseId: "",
+        skuOrPurchaseId: item.SKU,
         amount: lineItem.feeBasisAmount.value,
-        description: "",
+        description: item.Title,
         who: `eBay: ${ebayTransaction.buyer.username}`,
       },
       ...lineItem.marketplaceFees.map((fee) => {
@@ -112,7 +117,7 @@ const extractSaleTransactions = (ebayTransaction) => {
           transactionDate: transactionDate,
           creditedAccount: ACCOUNT_NAME__EBAY,
           debitedAccount: ACCOUNT_NAME__TRANSACTION_FEES,
-          skuOrPurchaseId: "",
+          skuOrPurchaseId: item.SKU,
           amount: fee.amount.value,
           description: feeData.description,
           who: "eBay",

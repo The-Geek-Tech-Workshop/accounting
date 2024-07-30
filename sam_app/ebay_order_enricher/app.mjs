@@ -7,30 +7,20 @@ const eBayAuth = JSON.parse(
 );
 
 const QUEUE_URL = process.env.QUEUE_URL;
-const EBAY_CLIENT_ID = process.env.EBAY_CLIENT_ID;
-const EBAY_DEVELOPER_ID = process.env.EBAY_DEVELOPER_ID;
 
 const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 
-// const ebayClient = new eBayApi({
-//   appId: EBAY_CLIENT_ID,
-//   certId: eBayAuth.certId,
-//   sandbox: false,
-//   devId: EBAY_DEVELOPER_ID,
-//   marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
-//   // authToken: eBayAuth.authNAuth.token,
-// });
 const ebayClient = new eBayApi({
-  appId: EBAY_CLIENT_ID,
+  appId: eBayAuth.clientId,
   certId: eBayAuth.certId,
   sandbox: false,
-  devId: EBAY_DEVELOPER_ID,
+  devId: eBayAuth.developerId,
   marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
   signature: {
     jwe: eBayAuth.digitalSignature.jwe,
     privateKey: eBayAuth.digitalSignature.privateKey,
   },
-  ruName: "Andrew_Todd-AndrewTo-GTWAcc-lbzukjtcf",
+  ruName: eBayAuth.oAuth2.ruName,
 });
 ebayClient.OAuth2.setCredentials(eBayAuth.oAuth2.credentials);
 
@@ -44,7 +34,6 @@ export const lambdaHandler = async (event) => {
     const ebayOrderResponse = await ebayClient.trading.GetOrders({
       OrderIDArray: [{ OrderID: ebayOrderId }],
     });
-    console.log(JSON.stringify(ebayOrderResponse));
 
     const order = ebayOrderResponse.OrderArray.Order[0];
     const item = order.TransactionArray.Transaction[0];
