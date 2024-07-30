@@ -7,16 +7,9 @@ const STARLING_SOURCE = "STARLING";
 const TOPIC_ARN = process.env.TOPIC_ARN;
 const EBAY_STARLING_UID = "ae3f1752-1bf2-4bf5-8a03-2fad3dc3d468";
 
-const ebayOrderIdRegex = /^eBay .\*(?<orderId>.+)$/gm;
+const ebayOrderIdRegex = /^eBay O\*(?<orderId>.+)$/gm;
+const ebayPayoutIdRegex = /^P\*(?<payoutId>.+)$/gm;
 const sns = new AWS.SNS();
-/**
- *
- * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
- * @param {Object} event - API Gateway Lambda Proxy Input Format
- *
- * Context doc: https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-context.html
- * @param {Object} context
- */
 
 export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
@@ -31,12 +24,21 @@ export const lambdaHandler = async (event) => {
       ? ""
       : STARLING_BANK_ACCOUNT_NAME;
 
-    const additionalMessageAttributes =
+    const ebayOrderIdMessageAttribute =
       transactionWasOutgoing && feedItem.counterPartyUid === EBAY_STARLING_UID
         ? {
             ebayOrderId: {
               DataType: "String",
               StringValue: ebayOrderIdRegex.match(feedItem.reference).orderId,
+            },
+          }
+        : {};
+    const ebayPayoutIdMessageAttribute =
+      !transactionWasOutgoing && feedItem.counterPartyUid === EBAY_STARLING_UID
+        ? {
+            ebayPayoutId: {
+              DataType: "String",
+              StringValue: ebayPayoutIdRegex.match(feedItem.reference).payoutId,
             },
           }
         : {};
@@ -59,7 +61,8 @@ export const lambdaHandler = async (event) => {
             DataType: "String",
             StringValue: transactionId,
           },
-          ...additionalMessageAttributes,
+          ...ebayOrderIdMessageAttribute,
+          ...ebayPayoutIdMessageAttribute,
         },
         TopicArn: TOPIC_ARN,
       })

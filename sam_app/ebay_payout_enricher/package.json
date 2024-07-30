@@ -1,0 +1,19 @@
+{
+  "name": "ebay_order_enricher",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "author": "Andrew Todd",
+  "dependencies": {
+    "aws-sdk": "^2.1659.0",
+    "dateformat": "^5.0.3",
+    "ebay-api": "^9.1.0"
+  },
+  "scripts": {
+    "test": "mocha tests/unit/"
+  },
+  "devDependencies": {
+    "chai": "^4.3.6",
+    "mocha": "^10.2.0"
+  }
+}
