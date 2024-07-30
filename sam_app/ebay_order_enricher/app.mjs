@@ -12,14 +12,27 @@ const EBAY_DEVELOPER_ID = process.env.EBAY_DEVELOPER_ID;
 
 const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 
+// const ebayClient = new eBayApi({
+//   appId: EBAY_CLIENT_ID,
+//   certId: eBayAuth.certId,
+//   sandbox: false,
+//   devId: EBAY_DEVELOPER_ID,
+//   marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
+//   // authToken: eBayAuth.authNAuth.token,
+// });
 const ebayClient = new eBayApi({
   appId: EBAY_CLIENT_ID,
   certId: eBayAuth.certId,
   sandbox: false,
   devId: EBAY_DEVELOPER_ID,
   marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
-  authToken: eBayAuth.token,
+  signature: {
+    jwe: eBayAuth.digitalSignature.jwe,
+    privateKey: eBayAuth.digitalSignature.privateKey,
+  },
+  ruName: "Andrew_Todd-AndrewTo-GTWAcc-lbzukjtcf",
 });
+ebayClient.OAuth2.setCredentials(eBayAuth.oAuth2.credentials);
 
 const sqs = new AWS.SQS();
 
@@ -31,6 +44,7 @@ export const lambdaHandler = async (event) => {
     const ebayOrderResponse = await ebayClient.trading.GetOrders({
       OrderIDArray: [{ OrderID: ebayOrderId }],
     });
+    console.log(JSON.stringify(ebayOrderResponse));
 
     const order = ebayOrderResponse.OrderArray.Order[0];
     const item = order.TransactionArray.Transaction[0];

@@ -9,8 +9,6 @@ const eBayAuth = JSON.parse(
 
 const ISO_DATE_MASK = "isoDate";
 const QUEUE_URL = process.env.QUEUE_URL;
-const EBAY_CLIENT_ID = process.env.EBAY_CLIENT_ID;
-const EBAY_DEVELOPER_ID = process.env.EBAY_DEVELOPER_ID;
 
 const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 const ACCOUNTING_SOURCE__EBAY = "EBAY";
@@ -36,22 +34,18 @@ const EBAY_FEE_DATA = {
 };
 
 const ebayClient = new eBayApi({
-  appId: EBAY_CLIENT_ID,
+  appId: eBayAuth.clientId,
   certId: eBayAuth.certId,
   sandbox: false,
-  devId: EBAY_DEVELOPER_ID,
+  devId: eBayAuth.developerId,
   marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
   signature: {
     jwe: eBayAuth.digitalSignature.jwe,
     privateKey: eBayAuth.digitalSignature.privateKey,
   },
-  scope: [
-    "https://api.ebay.com/oauth/api_scope",
-    "https://api.ebay.com/oauth/api_scope/sell.finances.readonly",
-    "https://api.ebay.com/oauth/api_scope/sell.finances",
-  ],
+  ruName: eBayAuth.oAuth2.ruName,
 });
-ebayClient.OAuth2.setCredentials(eBayAuth.oAuth2.token);
+ebayClient.OAuth2.setCredentials(eBayAuth.oAuth2.credentials);
 
 const sqs = new AWS.SQS();
 
@@ -59,14 +53,10 @@ export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
     const transaction = JSON.parse(record.body);
     const ebayPayoutId = record.attributes.eBayPayoutId;
-
     const eBayTransactionsResponse =
       await ebayClient.sell.finances.sign.getTransactions({
         filter: `payoutId:{${ebayPayoutId}}`,
       });
-
-    // console.log(JSON.stringify(eBayTransactionsResponse));
-
     const messages = eBayTransactionsResponse.transactions.reduce(
       (messagesSoFar, ebayTransaction) => {
         const newMessages =
@@ -83,9 +73,7 @@ export const lambdaHandler = async (event) => {
         },
       ]
     );
-
-    console.log(JSON.stringify(messages));
-
+    // console.log(JSON.stringify(messages));
     await sqs
       .sendMessageBatch({
         Entries: messages.map((message) => {
@@ -99,12 +87,10 @@ export const lambdaHandler = async (event) => {
       .promise();
   }
 };
-
 const extractSaleTransactions = (ebayTransaction) => {
   return ebayTransaction.orderLineItems.reduce((messages, lineItem) => {
     const baseSourceTransactionId = `${ebayTransaction.transactionId}-${lineItem.lineItemId}`;
     const transactionDate = toIsoDateString(ebayTransaction.transactionDate);
-
     return [
       ...messages,
       {
