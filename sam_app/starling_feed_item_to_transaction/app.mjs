@@ -5,7 +5,7 @@ const ISO_DATE_MASK = "isoDate";
 const STARLING_BANK_ACCOUNT_NAME = "GTW";
 const STARLING_SOURCE = "STARLING";
 const TOPIC_ARN = process.env.TOPIC_ARN;
-const EBAY_STARLING_UID = "ae3f1752-1bf2-4bf5-8a03-2fad3dc3d468";
+const STARLING_EBAY_NAME = "eBay";
 
 const ebayOrderIdRegex = /^eBay O\*(?<orderId>.+)$/gm;
 const ebayPayoutIdRegex = /^P\*(?<payoutId>.+)$/gm;
@@ -25,49 +25,50 @@ export const lambdaHandler = async (event) => {
       : STARLING_BANK_ACCOUNT_NAME;
 
     const ebayOrderIdMessageAttribute =
-      transactionWasOutgoing && feedItem.counterPartyUid === EBAY_STARLING_UID
+      transactionWasOutgoing && feedItem.counterPartyName === STARLING_EBAY_NAME
         ? {
-            ebayOrderId: {
+            eBayOrderId: {
               DataType: "String",
-              StringValue: ebayOrderIdRegex.match(feedItem.reference).orderId,
+              StringValue: ebayOrderIdRegex.exec(feedItem.reference).groups
+                .orderId,
             },
           }
         : {};
     const ebayPayoutIdMessageAttribute =
-      !transactionWasOutgoing && feedItem.counterPartyUid === EBAY_STARLING_UID
+      !transactionWasOutgoing &&
+      feedItem.counterPartyName === STARLING_EBAY_NAME
         ? {
-            ebayPayoutId: {
+            eBayPayoutId: {
               DataType: "String",
-              StringValue: ebayPayoutIdRegex.match(feedItem.reference).payoutId,
+              StringValue: ebayPayoutIdRegex.exec(feedItem.reference).groups
+                .payoutId,
             },
           }
         : {};
 
-    await sns
-      .publish({
-        Message: JSON.stringify({
-          source: STARLING_SOURCE,
-          sourceTransactionId: feedItem.feedItemUid,
-          transactionDate: toIsoDateString(feedItem.transactionTime),
-          creditedAccount: creditedAccount,
-          debitedAccount: debitedAccount,
-          skuOrPurchaseId: "",
-          amount: feedItem.amount.minorUnits / 100,
-          description: feedItem.reference,
-          who: feedItem.counterPartyName,
-        }),
-        MessageAttributes: {
-          transactionId: {
-            DataType: "String",
-            StringValue: transactionId,
-          },
-          ...ebayOrderIdMessageAttribute,
-          ...ebayPayoutIdMessageAttribute,
+    const message = {
+      Message: JSON.stringify({
+        source: STARLING_SOURCE,
+        sourceTransactionId: feedItem.feedItemUid,
+        transactionDate: toIsoDateString(feedItem.transactionTime),
+        creditedAccount: creditedAccount,
+        debitedAccount: debitedAccount,
+        skuOrPurchaseId: "",
+        amount: feedItem.amount.minorUnits / 100,
+        description: feedItem.reference,
+        who: feedItem.counterPartyName,
+      }),
+      MessageAttributes: {
+        transactionId: {
+          DataType: "String",
+          StringValue: transactionId,
         },
-        TopicArn: TOPIC_ARN,
-      })
-      .promise();
-    console.log(`Transaction ${transactionId} message sent`);
+        ...ebayOrderIdMessageAttribute,
+        ...ebayPayoutIdMessageAttribute,
+      },
+      TopicArn: TOPIC_ARN,
+    };
+    await sns.publish(message).promise();
   }
 };
 

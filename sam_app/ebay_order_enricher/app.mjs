@@ -29,7 +29,7 @@ const sqs = new AWS.SQS();
 export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
     const transaction = JSON.parse(record.body);
-    const ebayOrderId = record.attributes.eBayOrderId;
+    const ebayOrderId = record.messageAttributes.eBayOrderId.stringValue;
 
     const ebayOrderResponse = await ebayClient.trading.GetOrders({
       OrderIDArray: [{ OrderID: ebayOrderId }],

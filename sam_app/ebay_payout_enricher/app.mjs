@@ -51,7 +51,7 @@ const sqs = new AWS.SQS();
 export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
     const transaction = JSON.parse(record.body);
-    const ebayPayoutId = record.attributes.eBayPayoutId;
+    const ebayPayoutId = record.messageAttributes.eBayPayoutId.stringValue;
     const eBayTransactionsResponse =
       await ebayClient.sell.finances.sign.getTransactions({
         filter: `payoutId:{${ebayPayoutId}}`,
@@ -72,7 +72,6 @@ export const lambdaHandler = async (event) => {
         },
       ]
     );
-    console.log(JSON.stringify(messages));
     await sqs
       .sendMessageBatch({
         Entries: messages.map((message) => {
