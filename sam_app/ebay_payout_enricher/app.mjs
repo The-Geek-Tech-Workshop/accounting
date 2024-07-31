@@ -13,9 +13,11 @@ const QUEUE_URL = process.env.QUEUE_URL;
 const ACCOUNTING_SOURCE__EBAY = "EBAY";
 const ACCOUNT_NAME__SALES = "Sales";
 const ACCOUNT_NAME__EBAY = "eBay (GTW)";
+const ACCOUNT_NAME__OUTWARD_SHIPPING = "Outward Shipping";
 const ACCOUNT_NAME__TRANSACTION_FEES = "Transaction Fees";
 
 const EBAY_TRANSACTION_TYPE__SALE = "SALE";
+const EBAY_TRANSACTION_TYPE__SHIPPING_LABEL = "SHIPPING_LABEL";
 
 const EBAY_FEE_DATA = {
   REGULATORY_OPERATING_FEE: {
@@ -57,20 +59,25 @@ export const lambdaHandler = async (event) => {
         filter: `payoutId:{${ebayPayoutId}}`,
       });
     const messages = await eBayTransactionsResponse.transactions.reduce(
-      async (messagesSoFar, ebayTransaction) => {
+      async (messagesSoFarP, ebayTransaction) => {
+        const messagesSoFar = await messagesSoFarP;
+
         const newMessages =
           ebayTransaction.transactionType === EBAY_TRANSACTION_TYPE__SALE
             ? await extractSaleTransactions(ebayTransaction)
+            : ebayTransaction.transactionType ===
+              EBAY_TRANSACTION_TYPE__SHIPPING_LABEL
+            ? await extractShippingLabelTransactions(ebayTransaction)
             : [];
-        return [...messagesSoFar, ...newMessages];
+        return Promise.resolve([...messagesSoFar, ...newMessages]);
       },
-      [
+      Promise.resolve([
         {
           ...transaction,
           creditedAccount: ACCOUNT_NAME__EBAY,
           description: `Payout ${ebayPayoutId}`,
         },
-      ]
+      ])
     );
     await sqs
       .sendMessageBatch({
@@ -124,6 +131,29 @@ const extractSaleTransactions = async (ebayTransaction) => {
       }),
     ];
   }, []);
+};
+const extractShippingLabelTransactions = async (ebayTransaction) => {
+  const ebayOrderResponse = await ebayClient.trading.GetOrders({
+    OrderIDArray: [{ OrderID: ebayTransaction.orderId }],
+  });
+  const order = ebayOrderResponse.OrderArray.Order[0];
+  const orderTransaction = order.TransactionArray.Transaction[0];
+  const item = order.TransactionArray.Transaction[0].Item;
+  return [
+    {
+      source: ACCOUNTING_SOURCE__EBAY,
+      sourceTransactionId: ebayTransaction.transactionId,
+      transactionDate: toIsoDateString(ebayTransaction.transactionDate),
+      creditedAccount: ACCOUNT_NAME__EBAY,
+      debitedAccount: ACCOUNT_NAME__OUTWARD_SHIPPING,
+      skuOrPurchaseId: item.SKU,
+      amount: ebayTransaction.amount.value,
+      description:
+        orderTransaction.ShippingDetails.ShipmentTrackingDetails
+          .ShippingCarrierUsed,
+      who: "eBay",
+    },
+  ];
 };
 
 const toIsoDateString = (isoDateTimeString) =>
