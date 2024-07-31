@@ -82,7 +82,11 @@ Resources:
       Endpoint: !GetAtt SheetsWriterQueue.Arn
       RawMessageDelivery: true
       FilterPolicyScope: MessageAttributes
-      FilterPolicy: { "eBayOrderId": [{ "exists": false }] }
+      FilterPolicy:
+        {
+          "eBayOrderId": [{ "exists": false }],
+          "eBayPayoutId": [{ "exists": false }],
+        }
   EbayOrderEnricherAccountingEntrySubscription:
     Type: AWS::SNS::Subscription
     Properties:
@@ -216,6 +220,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt SheetsWriterQueue.Arn
+            BatchSize: 1
     Connectors:
       IncomingQueueConnector:
         Properties:

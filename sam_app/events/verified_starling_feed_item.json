@@ -1,0 +1,7 @@
+{
+  "Records": [
+    {
+      "body": "{\"webhookEventUid\":\"06dcc8a8-43c3-47bd-8701-cb57c563f197\",\"webhookType\":\"FEED_ITEM\",\"eventTimestamp\":\"2024-07-31T02:04:55.486Z\",\"accountHolderUid\":\"eee4ab30-7ac7-4495-8c21-83090126f2e5\",\"content\":{\"feedItemUid\":\"044e687a-92ed-4163-96fa-8540fb045835\",\"categoryUid\":\"706efb37-4584-44d4-8e8f-a106dd991db9\",\"accountUid\":\"0a7b0c53-8e02-4979-8adc-94c36edd7ff5\",\"amount\":{\"currency\":\"GBP\",\"minorUnits\":3121},\"sourceAmount\":{\"currency\":\"GBP\",\"minorUnits\":3121},\"direction\":\"OUT\",\"updatedAt\":\"2024-07-31T02:04:55.354Z\",\"transactionTime\":\"2024-07-30T15:10:08.000Z\",\"settlementTime\":\"2024-07-31T02:04:55.072Z\",\"source\":\"MASTER_CARD\",\"sourceSubType\":\"ANDROID_PAY_ONLINE\",\"status\":\"SETTLED\",\"transactingApplicationUserUid\":\"4f4c6c4e-3cc5-4d01-b62e-7c6d5d29e01e\",\"counterPartyType\":\"MERCHANT\",\"counterPartyUid\":\"f0d771f7-ca34-4eb1-85e0-55406864aa2f\",\"counterPartyName\":\"eBay\",\"counterPartySubEntityUid\":\"ae3f74dd-109f-4d52-9461-a7f4e6e83bc8\",\"reference\":\"eBay O*03-11888-57522\",\"country\":\"GB\",\"spendingCategory\":\"SHOPPING\",\"hasAttachment\":false,\"receiptPresent\":false,\"masterCardFeedDetails\":{\"merchantIdentifier\":\"797967000433788\",\"mcc\":5311,\"posTimestamp\":\"17:14:35\",\"authorisationCode\":\"My704R\",\"cardLast4\":\"5883\"}}}"
+    }
+  ]
+}
