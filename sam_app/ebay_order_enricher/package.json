@@ -6,7 +6,7 @@
   "author": "Andrew Todd",
   "dependencies": {
     "aws-sdk": "^2.1659.0",
-    "ebay-api": "^9.1.0"
+    "gtw-ebay-client": "file:../gtw-ebay-client/gtw-ebay-client-1.0.0.tgz"
   },
   "scripts": {
     "test": "mocha tests/unit/"

@@ -1,29 +1,13 @@
 import AWS from "aws-sdk";
-import eBayApi from "ebay-api";
-import { readFile } from "fs/promises";
-
-const eBayAuth = JSON.parse(
-  await readFile(new URL("./ebay-auth.json", import.meta.url))
-);
+import ebayClientBuilder from "gtw-ebay-client";
 
 const QUEUE_URL = process.env.QUEUE_URL;
 
 const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 
-const ebayClient = new eBayApi({
-  appId: eBayAuth.clientId,
-  certId: eBayAuth.certId,
-  sandbox: false,
-  devId: eBayAuth.developerId,
-  marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
-  signature: {
-    jwe: eBayAuth.digitalSignature.jwe,
-    privateKey: eBayAuth.digitalSignature.privateKey,
-  },
-  ruName: eBayAuth.oAuth2.ruName,
-});
-ebayClient.OAuth2.setCredentials(eBayAuth.oAuth2.credentials);
-
+const ebayClient = await ebayClientBuilder(
+  `${import.meta.dirname}/ebay-auth.json`
+);
 const sqs = new AWS.SQS();
 
 export const lambdaHandler = async (event) => {
@@ -55,20 +39,22 @@ export const lambdaHandler = async (event) => {
             },
           ]
         : [];
+    const messages = [
+      {
+        Id: "item",
+        MessageBody: JSON.stringify({
+          ...transaction,
+          amount: item.TransactionPrice.value,
+          description: item.Item.Title,
+          who: who,
+        }),
+      },
+      ...additionalMessages,
+    ];
+
     await sqs
       .sendMessageBatch({
-        Entries: [
-          {
-            Id: "item",
-            MessageBody: JSON.stringify({
-              ...transaction,
-              amount: item.TransactionPrice.value,
-              description: item.Item.Title,
-              who: who,
-            }),
-          },
-          ...additionalMessages,
-        ],
+        Entries: messages,
         QueueUrl: QUEUE_URL,
       })
       .promise();

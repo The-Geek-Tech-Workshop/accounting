@@ -5,7 +5,7 @@ const ISO_DATE_MASK = "isoDate";
 const STARLING_BANK_ACCOUNT_NAME = "GTW";
 const STARLING_SOURCE = "STARLING";
 const TOPIC_ARN = process.env.TOPIC_ARN;
-const STARLING_EBAY_NAME = "eBay";
+const STARLING_EBAY_NAMES = ["eBay", "EBAY Commerce UK Ltd"];
 
 const ebayOrderIdRegex = /^eBay O\*(?<orderId>.+)$/gm;
 const ebayPayoutIdRegex = /^P\*(?<payoutId>.+)$/gm;
@@ -25,7 +25,8 @@ export const lambdaHandler = async (event) => {
       : STARLING_BANK_ACCOUNT_NAME;
 
     const ebayOrderIdMessageAttribute =
-      transactionWasOutgoing && feedItem.counterPartyName === STARLING_EBAY_NAME
+      transactionWasOutgoing &&
+      STARLING_EBAY_NAMES.includes(feedItem.counterPartyName)
         ? {
             eBayOrderId: {
               DataType: "String",
@@ -36,7 +37,7 @@ export const lambdaHandler = async (event) => {
         : {};
     const ebayPayoutIdMessageAttribute =
       !transactionWasOutgoing &&
-      feedItem.counterPartyName === STARLING_EBAY_NAME
+      STARLING_EBAY_NAMES.includes(feedItem.counterPartyName)
         ? {
             eBayPayoutId: {
               DataType: "String",

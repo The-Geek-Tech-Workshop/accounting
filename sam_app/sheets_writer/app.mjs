@@ -10,114 +10,102 @@ const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
 const TRANSACTION_ID_METADATA_KEY = "transactionId";
 const NEW_ROW_NUMBER = 3;
+const a1RangeRowNumber = NEW_ROW_NUMBER;
+const a1Range = `Transactions!A${a1RangeRowNumber}:I${a1RangeRowNumber}`;
 
 const auth = new GoogleAuth({ scopes: SCOPES });
 const client = await auth.getClient();
 const sheetsApi = google.sheets({ version: "v4", auth: client });
 
-/**
- *
- * Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
- * @param {Object} transaction - API Gateway Lambda Proxy Input Format
- *
- * Context doc: https://docs.aws.amazon.com/lambda/latest/dg/nodejs-prog-model-context.html
- * @param {Object} context
- *
- * Return doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
- * @returns {Object} object - API Gateway Lambda Proxy Output Format
- *
- */
+const sheetResult = await sheetsApi.spreadsheets.get({
+  spreadsheetId: SPREADSHEET_ID,
+  ranges: ["Transactions"],
+});
+const transactionsSheetId = sheetResult.data.sheets[0].properties.sheetId;
+
+const rowResult = await sheetsApi.spreadsheets.values.get({
+  spreadsheetId: SPREADSHEET_ID,
+  valueRenderOption: "FORMULA",
+  range: a1Range,
+});
+const existingRow = rowResult.data.values[0];
+const creditedAccountAssetLookupFunction = existingRow[2];
+const debitedAccountAssetLookupFunction = existingRow[4];
 
 export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
     const transaction = JSON.parse(record.body);
     const transactionId = `${transaction.source}-${transaction.sourceTransactionId}`;
+    console.log(`Transaction: ${transactionId}`);
 
-    const sheetResult = await sheetsApi.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_ID,
-      ranges: ["Transactions"],
-    });
-    const transactionsSheetId = sheetResult.data.sheets[0].properties.sheetId;
-
-    const existingTransactionResult =
-      await sheetsApi.spreadsheets.developerMetadata.search({
-        spreadsheetId: SPREADSHEET_ID,
-        resource: {
-          dataFilters: [
-            {
-              developerMetadataLookup: {
-                metadataKey: TRANSACTION_ID_METADATA_KEY,
-                metadataValue: transactionId,
-              },
-            },
-          ],
-        },
-      });
-    const existingTransaction =
-      Object.keys(existingTransactionResult.data).length > 0
-        ? existingTransactionResult.data.matchedDeveloperMetadata[0]
-        : null;
-
-    if (existingTransaction) {
+    if (await doesTransactionAlreadyExist(transactionId)) {
       console.log(`Transaction ${transactionId} already exists. Skipping...`);
       continue;
     }
 
-    const a1RangeRowNumber = existingTransaction
-      ? existingTransaction.developerMetadata.location.dimensionRange.endIndex
-      : NEW_ROW_NUMBER;
-    const a1Range = `Transactions!A${a1RangeRowNumber}:I${a1RangeRowNumber}`;
+    const createNewRowRequest = {
+      insertDimension: {
+        range: {
+          sheetId: transactionsSheetId,
+          dimension: "ROWS",
+          startIndex: NEW_ROW_NUMBER - 1,
+          endIndex: NEW_ROW_NUMBER,
+        },
+        inheritFromBefore: true,
+      },
+    };
 
-    const rowResult = await sheetsApi.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      valueRenderOption: "FORMULA",
-      range: a1Range,
-    });
-
-    const existingRow = rowResult.data.values[0];
-    const creditedAccountAssetLookupFunction = existingRow[2];
-    const debitedAccountAssetLookupFunction = existingRow[4];
-
-    // Insert new row
-    await sheetsApi.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      resource: {
-        requests: [
+    const updateCellsRequest = {
+      updateCells: {
+        range: {
+          sheetId: transactionsSheetId,
+          startRowIndex: NEW_ROW_NUMBER - 1,
+          endRowIndex: NEW_ROW_NUMBER,
+        },
+        fields: "userEnteredValue",
+        rows: [
           {
-            insertDimension: {
-              range: {
-                sheetId: transactionsSheetId,
-                dimension: "ROWS",
-                startIndex: NEW_ROW_NUMBER - 1,
-                endIndex: NEW_ROW_NUMBER,
+            values: [
+              {
+                userEnteredValue: {
+                  numberValue: serialNumberFormatDate(
+                    new Date(transaction.transactionDate)
+                  ),
+                },
               },
-              inheritFromBefore: true,
-            },
+              {
+                userEnteredValue: { stringValue: transaction.creditedAccount },
+              },
+              {
+                userEnteredValue: {
+                  formulaValue: creditedAccountAssetLookupFunction,
+                },
+              },
+              {
+                userEnteredValue: { stringValue: transaction.debitedAccount },
+              },
+              {
+                userEnteredValue: {
+                  formulaValue: debitedAccountAssetLookupFunction,
+                },
+              },
+              {
+                userEnteredValue: { numberValue: transaction.amount },
+              },
+              {
+                userEnteredValue: { stringValue: transaction.skuOrPurchaseId },
+              },
+              {
+                userEnteredValue: { stringValue: transaction.description },
+              },
+              {
+                userEnteredValue: { stringValue: transaction.who },
+              },
+            ],
           },
         ],
       },
-    });
-
-    await sheetsApi.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: a1Range,
-      valueInputOption: "USER_ENTERED",
-      resource: {
-        values: [
-          [
-            transaction.transactionDate,
-            transaction.creditedAccount,
-            creditedAccountAssetLookupFunction,
-            transaction.debitedAccount,
-            debitedAccountAssetLookupFunction,
-            transaction.amount,
-            transaction.skuOrPurchaseId,
-            transaction.description,
-            transaction.who,
-          ],
-        ],
-      },
-    });
+    };
 
     const createDeveloperMetadataRequest = {
       createDeveloperMetadata: {
@@ -137,26 +125,60 @@ export const lambdaHandler = async (event) => {
       },
     };
 
+    const sortRowsRequest = {
+      sortRange: {
+        range: {
+          sheetId: transactionsSheetId,
+        },
+        sortSpecs: [
+          {
+            dimensionIndex: 0,
+            sortOrder: "DESCENDING",
+          },
+        ],
+      },
+    };
+
     await sheetsApi.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
       resource: {
         requests: [
-          ...(existingTransaction ? [] : [createDeveloperMetadataRequest]),
-          {
-            sortRange: {
-              range: {
-                sheetId: transactionsSheetId,
-              },
-              sortSpecs: [
-                {
-                  dimensionIndex: 0,
-                  sortOrder: "DESCENDING",
-                },
-              ],
-            },
-          },
+          createNewRowRequest,
+          updateCellsRequest,
+          createDeveloperMetadataRequest,
+          sortRowsRequest,
         ],
       },
     });
   }
 };
+
+const doesTransactionAlreadyExist = async (transactionId) => {
+  const existingTransactionResult =
+    await sheetsApi.spreadsheets.developerMetadata.search({
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        dataFilters: [
+          {
+            developerMetadataLookup: {
+              metadataKey: TRANSACTION_ID_METADATA_KEY,
+              metadataValue: transactionId,
+            },
+          },
+        ],
+      },
+    });
+
+  return Object.keys(existingTransactionResult.data).length > 0;
+};
+
+const MILLISECONDS_IN_A_DAY = 1000 * 3600 * 24;
+const MILLISECONDS_IN_AN_HOUR = 60 * 1000;
+const DAYS_BETWEEN_SERIAL_NUMBER_FORMAT_EPOCH_AND_JAVASCRIPT_DATE_EPOCH = 25569.0;
+
+const serialNumberFormatDate = (date) =>
+  Math.round(
+    DAYS_BETWEEN_SERIAL_NUMBER_FORMAT_EPOCH_AND_JAVASCRIPT_DATE_EPOCH +
+      (date.getTime() - date.getTimezoneOffset() * MILLISECONDS_IN_AN_HOUR) /
+        MILLISECONDS_IN_A_DAY
+  );

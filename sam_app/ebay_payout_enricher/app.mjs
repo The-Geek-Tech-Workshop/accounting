@@ -1,11 +1,6 @@
 import AWS from "aws-sdk";
-import eBayApi from "ebay-api";
-import { readFile } from "fs/promises";
 import dateFormat from "dateformat";
-
-const eBayAuth = JSON.parse(
-  await readFile(new URL("./ebay-auth.json", import.meta.url))
-);
+import ebayClientBuilder from "gtw-ebay-client";
 
 const ISO_DATE_MASK = "isoDate";
 const QUEUE_URL = process.env.QUEUE_URL;
@@ -34,19 +29,9 @@ const EBAY_FEE_DATA = {
   },
 };
 
-const ebayClient = new eBayApi({
-  appId: eBayAuth.clientId,
-  certId: eBayAuth.certId,
-  sandbox: false,
-  devId: eBayAuth.developerId,
-  marketplaceId: eBayApi.MarketplaceId.EBAY_GB,
-  signature: {
-    jwe: eBayAuth.digitalSignature.jwe,
-    privateKey: eBayAuth.digitalSignature.privateKey,
-  },
-  ruName: eBayAuth.oAuth2.ruName,
-});
-ebayClient.OAuth2.setCredentials(eBayAuth.oAuth2.credentials);
+const ebayClient = await ebayClientBuilder(
+  `${import.meta.dirname}/ebay-auth.json`
+);
 
 const sqs = new AWS.SQS();
 
