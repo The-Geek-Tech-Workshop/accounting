@@ -5,12 +5,13 @@ Description: >
 Parameters:
   SpreadsheetId:
     Type: String
-  PublicKey:
+  StarlingPersonalPublicKey:
+    Type: String
+  StarlingBusinessPublicKey:
     Type: String
   GoogleCredentialsFile:
     Type: String
 
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
     Timeout: 10
@@ -107,19 +108,40 @@ Resources:
       FilterPolicy: { "eBayPayoutId": [{ "exists": true }] }
   StarlingVerifiedFeedItemQueue:
     Type: AWS::SQS::Queue
-  StarlingFeedItemWebhook:
+  StarlingPersonalFeedItemWebhook:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: starling_feed_item_webhook/
       Environment:
         Variables:
-          PUBLIC_KEY: !Ref PublicKey
+          PUBLIC_KEY: !Ref StarlingPersonalPublicKey
           QUEUE_URL: !GetAtt StarlingVerifiedFeedItemQueue.QueueUrl
       Events:
         StarlingFeedItem:
           Type: Api
           Properties:
             Path: /starling/feed-item
+            Method: post
+    Connectors:
+      OutgoingQueueConnector:
+        Properties:
+          Destination:
+            Id: StarlingVerifiedFeedItemQueue
+          Permissions:
+            - Write
+  StarlingBusinessFeedItemWebhook:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: starling_feed_item_webhook/
+      Environment:
+        Variables:
+          PUBLIC_KEY: !Ref StarlingBusinessPublicKey
+          QUEUE_URL: !GetAtt StarlingVerifiedFeedItemQueue.QueueUrl
+      Events:
+        StarlingFeedItem:
+          Type: Api
+          Properties:
+            Path: /starling/business/feed-item
             Method: post
     Connectors:
       OutgoingQueueConnector:
@@ -225,8 +247,3 @@ Resources:
             Id: SheetsWriterQueue
           Permissions:
             - Read
-
-Outputs:
-  StarlingFeedItemWebhook:
-    Description: "Starling ingress Function ARN"
-    Value: !GetAtt StarlingFeedItemWebhook.Arn
