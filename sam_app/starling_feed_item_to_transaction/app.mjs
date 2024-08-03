@@ -2,7 +2,12 @@ import dateFormat from "dateformat";
 import AWS from "aws-sdk";
 
 const ISO_DATE_MASK = "isoDate";
+const STARLING_ACCOUNT_TO_BANK_ACCOUNT_NAME_MAPPING = {
+  "eee4ab30-7ac7-4495-8c21-83090126f2e5": "GTW",
+  "16561956-bd87-4f9e-bb2b-0428e6c42b15": "Starling (Business)",
+};
 const STARLING_BANK_ACCOUNT_NAME = "GTW";
+const STARLING_BUSINESS_BANK_ACCOUNT_NAME = "Starling (Business)";
 const STARLING_SOURCE = "STARLING";
 const TOPIC_ARN = process.env.TOPIC_ARN;
 const STARLING_EBAY_NAMES = ["eBay", "EBAY Commerce UK Ltd"];
@@ -13,16 +18,16 @@ const sns = new AWS.SNS();
 
 export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
-    const feedItem = JSON.parse(record.body).content;
+    const webhook = JSON.parse(record.body);
+    const feedItem = webhook.content;
 
     const transactionId = `${STARLING_SOURCE}-${feedItem.feedItemUid}`;
     const transactionWasOutgoing = feedItem.direction === "OUT";
-    const creditedAccount = transactionWasOutgoing
-      ? STARLING_BANK_ACCOUNT_NAME
-      : "";
-    const debitedAccount = transactionWasOutgoing
-      ? ""
-      : STARLING_BANK_ACCOUNT_NAME;
+    const starlingAccountName =
+      STARLING_ACCOUNT_TO_BANK_ACCOUNT_NAME_MAPPING[webhook.accountHolderUid];
+
+    const creditedAccount = transactionWasOutgoing ? starlingAccountName : "";
+    const debitedAccount = transactionWasOutgoing ? "" : starlingAccountName;
 
     const ebayOrderIdMessageAttribute =
       transactionWasOutgoing &&
