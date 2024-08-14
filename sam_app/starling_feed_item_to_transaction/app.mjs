@@ -2,12 +2,12 @@ import dateFormat from "dateformat";
 import AWS from "aws-sdk";
 
 const ISO_DATE_MASK = "isoDate";
-const STARLING_ACCOUNT_TO_BANK_ACCOUNT_NAME_MAPPING = {
-  "eee4ab30-7ac7-4495-8c21-83090126f2e5": "GTW",
-  "16561956-bd87-4f9e-bb2b-0428e6c42b15": "Starling (Business)",
-};
 const STARLING_BANK_ACCOUNT_NAME = "GTW";
 const STARLING_BUSINESS_BANK_ACCOUNT_NAME = "Starling (Business)";
+const STARLING_ACCOUNT_TO_BANK_ACCOUNT_NAME_MAPPING = {
+  "eee4ab30-7ac7-4495-8c21-83090126f2e5": STARLING_BANK_ACCOUNT_NAME,
+  "16561956-bd87-4f9e-bb2b-0428e6c42b15": STARLING_BUSINESS_BANK_ACCOUNT_NAME,
+};
 const STARLING_SOURCE = "STARLING";
 const TOPIC_ARN = process.env.TOPIC_ARN;
 const STARLING_EBAY_NAMES = ["eBay", "EBAY Commerce UK Ltd"];
@@ -29,28 +29,7 @@ export const lambdaHandler = async (event) => {
     const creditedAccount = transactionWasOutgoing ? starlingAccountName : "";
     const debitedAccount = transactionWasOutgoing ? "" : starlingAccountName;
 
-    const ebayOrderIdMessageAttribute =
-      transactionWasOutgoing &&
-      STARLING_EBAY_NAMES.includes(feedItem.counterPartyName)
-        ? {
-            eBayOrderId: {
-              DataType: "String",
-              StringValue: ebayOrderIdRegex.exec(feedItem.reference).groups
-                .orderId,
-            },
-          }
-        : {};
-    const ebayPayoutIdMessageAttribute =
-      !transactionWasOutgoing &&
-      STARLING_EBAY_NAMES.includes(feedItem.counterPartyName)
-        ? {
-            eBayPayoutId: {
-              DataType: "String",
-              StringValue: ebayPayoutIdRegex.exec(feedItem.reference).groups
-                .payoutId,
-            },
-          }
-        : {};
+    const ebayHeaders = extractEbayHeaders(transactionWasOutgoing, feedItem);
 
     const message = {
       Message: JSON.stringify({
@@ -69,13 +48,45 @@ export const lambdaHandler = async (event) => {
           DataType: "String",
           StringValue: transactionId,
         },
-        ...ebayOrderIdMessageAttribute,
-        ...ebayPayoutIdMessageAttribute,
+        ...ebayHeaders,
       },
       TopicArn: TOPIC_ARN,
     };
     await sns.publish(message).promise();
   }
+};
+
+const extractEbayHeaders = (transactionWasOutgoing, feedItem) => {
+  const ebayOrderIdMatch = ebayOrderIdRegex.exec(feedItem.reference);
+
+  const ebayOrderIdMessageAttribute =
+    transactionWasOutgoing &&
+    STARLING_EBAY_NAMES.includes(feedItem.counterPartyName) &&
+    ebayOrderIdMatch
+      ? {
+          eBayOrderId: {
+            DataType: "String",
+            StringValue: ebayOrderIdMatch.groups.orderId,
+          },
+        }
+      : {};
+
+  const ebayPayoutIdMatch = ebayPayoutIdRegex.exec(feedItem.reference);
+  const ebayPayoutIdMessageAttribute =
+    !transactionWasOutgoing &&
+    STARLING_EBAY_NAMES.includes(feedItem.counterPartyName) &&
+    ebayPayoutIdMatch
+      ? {
+          eBayPayoutId: {
+            DataType: "String",
+            StringValue: ebayPayoutIdMatch.groups.payoutId,
+          },
+        }
+      : {};
+  return {
+    ...ebayOrderIdMessageAttribute,
+    ...ebayPayoutIdMessageAttribute,
+  };
 };
 
 const toIsoDateString = (isoDateTimeString) =>
