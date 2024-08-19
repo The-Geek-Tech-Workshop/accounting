@@ -207,8 +207,6 @@ Resources:
       Environment:
         Variables:
           QUEUE_URL: !GetAtt SheetsWriterQueue.QueueUrl
-          EBAY_CLIENT_ID: "AndrewTo-GTWAccou-PRD-8c1cfea6d-06bc563b"
-          EBAY_DEVELOPER_ID: "90557685-1b1f-4087-8971-944e551282e1"
       Events:
         AccountsEntry:
           Type: SQS
