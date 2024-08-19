@@ -7,13 +7,14 @@ const PUBLIC_KEY = createPublicKey(
 const ENCRYPTION_ALGORITHM = "RSA-SHA512";
 const QUEUE_URL = process.env.QUEUE_URL;
 
+const sqs = new AWS.SQS();
+
 export const lambdaHandler = async (event) => {
   console.log(JSON.stringify(event));
 
   const verified = verifyEvent(event);
 
   if (verified) {
-    const sqs = new AWS.SQS();
     await sqs
       .sendMessage({
         MessageBody: event.body,

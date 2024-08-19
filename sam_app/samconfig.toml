@@ -9,6 +9,7 @@ stack_name = "accounting"
 [default.build.parameters]
 cached = true
 parallel = true
+build_in_source = true
 
 [default.validate.parameters]
 lint = true
