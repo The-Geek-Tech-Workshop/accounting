@@ -6,7 +6,7 @@
   "author": "Andrew Todd",
   "dependencies": {
     "aws-sdk": "^2.1659.0",
-    "axios": ">=1.6.0"
+    "axios": ">=1.7.4"
   },
   "scripts": {
     "test": "mocha tests/unit/"
