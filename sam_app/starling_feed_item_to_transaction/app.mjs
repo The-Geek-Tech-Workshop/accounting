@@ -16,6 +16,8 @@ const STARLING_SOURCE = "STARLING";
 const TOPIC_ARN = process.env.TOPIC_ARN;
 const STARLING_EBAY_NAMES = ["eBay", "EBAY Commerce UK Ltd"];
 
+const STARLING_TRANSACTION_STATUS__DECLINED = "DECLINED";
+
 const ebayOrderIdRegex = /^eBay O\*(?<orderId>.+)$/gm;
 const ebayPayoutIdRegex = /^P\*(?<payoutId>.+)$/gm;
 const sns = new AWS.SNS();
@@ -28,58 +30,65 @@ export const lambdaHandler = async (event) => {
   for (const record of event.Records) {
     const webhook = JSON.parse(record.body);
     const feedItem = webhook.content;
-
-    const transactionId = `${STARLING_SOURCE}-${feedItem.feedItemUid}`;
-    const transactionWasOutgoing = feedItem.direction === "OUT";
-    const starlingAccountName =
-      STARLING_ACCOUNT_TO_BANK_ACCOUNT_NAME_MAPPING[webhook.accountHolderUid];
-
-    const otherIsPersonalBankAccount =
-      feedItem.counterPartySubEntityIdentifier ===
-        personalData.bankAccount.sortCode &&
-      feedItem.counterPartySubEntitySubIdentifier ===
-        personalData.bankAccount.accountNumber;
-
-    const creditedAccount = transactionWasOutgoing
-      ? starlingAccountName
-      : otherIsPersonalBankAccount
-      ? ACCOUNT_NAME__CAPITAL
-      : "";
-    const debitedAccount = transactionWasOutgoing
-      ? otherIsPersonalBankAccount
-        ? ACCOUNT_NAME__DRAWINGS
-        : ""
-      : starlingAccountName;
-
-    const skuOrPurchaseId = otherIsPersonalBankAccount
-      ? SKU_OR_PURCHASE_ID__NA
-      : "";
-
-    const ebayHeaders = extractEbayHeaders(transactionWasOutgoing, feedItem);
-
-    const message = {
-      Message: JSON.stringify({
-        source: STARLING_SOURCE,
-        sourceTransactionId: feedItem.feedItemUid,
-        transactionDate: toIsoDateString(feedItem.transactionTime),
-        creditedAccount: creditedAccount,
-        debitedAccount: debitedAccount,
-        skuOrPurchaseId: skuOrPurchaseId,
-        amount: feedItem.amount.minorUnits / 100,
-        description: feedItem.reference,
-        who: feedItem.counterPartyName,
-      }),
-      MessageAttributes: {
-        transactionId: {
-          DataType: "String",
-          StringValue: transactionId,
-        },
-        ...ebayHeaders,
-      },
-      TopicArn: TOPIC_ARN,
-    };
-    await sns.publish(message).promise();
+    if (feedItem.status !== STARLING_TRANSACTION_STATUS__DECLINED) {
+      await extractAndSendTransaction(webhook.accountHolderUid, feedItem);
+    } else {
+      console.log("Transaction skipped: declined");
+    }
   }
+};
+
+const extractAndSendTransaction = async (accountHolderUid, feedItem) => {
+  const transactionId = `${STARLING_SOURCE}-${feedItem.feedItemUid}`;
+  const transactionWasOutgoing = feedItem.direction === "OUT";
+  const starlingAccountName =
+    STARLING_ACCOUNT_TO_BANK_ACCOUNT_NAME_MAPPING[accountHolderUid];
+
+  const otherIsPersonalBankAccount =
+    feedItem.counterPartySubEntityIdentifier ===
+      personalData.bankAccount.sortCode &&
+    feedItem.counterPartySubEntitySubIdentifier ===
+      personalData.bankAccount.accountNumber;
+
+  const creditedAccount = transactionWasOutgoing
+    ? starlingAccountName
+    : otherIsPersonalBankAccount
+    ? ACCOUNT_NAME__CAPITAL
+    : "";
+  const debitedAccount = transactionWasOutgoing
+    ? otherIsPersonalBankAccount
+      ? ACCOUNT_NAME__DRAWINGS
+      : ""
+    : starlingAccountName;
+
+  const skuOrPurchaseId = otherIsPersonalBankAccount
+    ? SKU_OR_PURCHASE_ID__NA
+    : "";
+
+  const ebayHeaders = extractEbayHeaders(transactionWasOutgoing, feedItem);
+
+  const message = {
+    Message: JSON.stringify({
+      source: STARLING_SOURCE,
+      sourceTransactionId: feedItem.feedItemUid,
+      transactionDate: toIsoDateString(feedItem.transactionTime),
+      creditedAccount: creditedAccount,
+      debitedAccount: debitedAccount,
+      skuOrPurchaseId: skuOrPurchaseId,
+      amount: feedItem.amount.minorUnits / 100,
+      description: feedItem.reference,
+      who: feedItem.counterPartyName,
+    }),
+    MessageAttributes: {
+      transactionId: {
+        DataType: "String",
+        StringValue: transactionId,
+      },
+      ...ebayHeaders,
+    },
+    TopicArn: TOPIC_ARN,
+  };
+  await sns.publish(message).promise();
 };
 
 const extractEbayHeaders = (transactionWasOutgoing, feedItem) => {
