@@ -5,6 +5,8 @@ const QUEUE_URL = process.env.QUEUE_URL;
 
 const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 
+const VAT_TAX_PERCENTAGE = 20;
+
 const ebayClient = await ebayClientBuilder(
   `${import.meta.dirname}/ebay-auth.json`
 );
@@ -23,6 +25,10 @@ export const lambdaHandler = async (event) => {
     const item = order.TransactionArray.Transaction[0];
     const who = `eBay: ${order.SellerUserID}`;
 
+    const costsIncludeVat = !!(item.Taxes.TotalTaxAmount.value === 0);
+
+    const getCost = (amount) => (costsIncludeVat ? amount : addVAT(amount));
+
     const additionalMessages =
       order.ShippingServiceSelected.ShippingServiceCost.value > 0
         ? [
@@ -32,7 +38,9 @@ export const lambdaHandler = async (event) => {
                 ...transaction,
                 sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
                 debitedAccount: INWARD_SHIPPING_ACCOUNT_NAME,
-                amount: order.ShippingServiceSelected.ShippingServiceCost.value,
+                amount: getCost(
+                  order.ShippingServiceSelected.ShippingServiceCost.value
+                ),
                 description: order.ShippingServiceSelected.ShippingService,
                 who: who,
               }),
@@ -44,7 +52,7 @@ export const lambdaHandler = async (event) => {
         Id: "item",
         MessageBody: JSON.stringify({
           ...transaction,
-          amount: item.TransactionPrice.value,
+          amount: getCost(item.TransactionPrice.value),
           description: item.Item.Title,
           who: who,
         }),
@@ -60,3 +68,10 @@ export const lambdaHandler = async (event) => {
       .promise();
   }
 };
+
+const addVAT = (costWithoutVAT) =>
+  roundCurrencyAmountDown(
+    costWithoutVAT + costWithoutVAT * (VAT_TAX_PERCENTAGE / 100)
+  );
+
+const roundCurrencyAmountDown = (amount) => Math.floor(amount * 100) / 100;
