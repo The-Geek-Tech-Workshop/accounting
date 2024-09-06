@@ -14,6 +14,19 @@ const ACCOUNT_NAME__TRANSACTION_FEES = "Transaction Fees";
 const EBAY_TRANSACTION_TYPE__SALE = "SALE";
 const EBAY_TRANSACTION_TYPE__SHIPPING_LABEL = "SHIPPING_LABEL";
 
+const MESSAGE_TYPE__TRANSACTION = {
+  messageType: {
+    DataType: "String",
+    StringValue: "TRANSACTION",
+  },
+};
+const MESSAGE_TYPE__DELIVERY_NOTIFICATION = {
+  messageType: {
+    DataType: "String",
+    StringValue: "DELIVERY_NOTIFICATION",
+  },
+};
+
 const EBAY_FEE_DATA = {
   REGULATORY_OPERATING_FEE: {
     code: "regOpFee",
@@ -58,23 +71,27 @@ export const lambdaHandler = async (event) => {
       },
       Promise.resolve([
         {
-          ...transaction,
-          creditedAccount: ACCOUNT_NAME__EBAY,
-          description: `Payout ${ebayPayoutId}`,
+          body: {
+            ...transaction,
+            creditedAccount: ACCOUNT_NAME__EBAY,
+            description: `Payout ${ebayPayoutId}`,
+          },
+          attributes: { ...MESSAGE_TYPE__TRANSACTION },
         },
       ])
     );
-    await sqs
-      .sendMessageBatch({
-        Entries: messages.map((message) => {
-          return {
-            Id: `${message.source}-${message.sourceTransactionId}`,
-            MessageBody: JSON.stringify(message),
-          };
-        }),
-        QueueUrl: QUEUE_URL,
-      })
-      .promise();
+    const messageBatch = {
+      Entries: messages.map((message) => {
+        return {
+          Id: `${message.body.source}-${message.body.sourceTransactionId}`,
+          MessageBody: JSON.stringify(message.body),
+          MessageAttributes: message.attributes,
+        };
+      }),
+      QueueUrl: QUEUE_URL,
+    };
+    // console.log(JSON.stringify(messageBatch));
+    await sqs.sendMessageBatch(messageBatch).promise();
   }
 };
 const extractSaleTransactions = async (ebayTransaction) => {
@@ -84,38 +101,59 @@ const extractSaleTransactions = async (ebayTransaction) => {
   const order = ebayOrderResponse.OrderArray.Order[0];
   const item = order.TransactionArray.Transaction[0].Item;
 
-  return ebayTransaction.orderLineItems.reduce((messages, lineItem) => {
-    const baseSourceTransactionId = `${ebayTransaction.transactionId}-${lineItem.lineItemId}`;
-    const transactionDate = toIsoDateString(ebayTransaction.transactionDate);
-    return [
-      ...messages,
+  return ebayTransaction.orderLineItems.reduce(
+    (messages, lineItem) => {
+      const baseSourceTransactionId = `${ebayTransaction.transactionId}-${lineItem.lineItemId}`;
+      const transactionDate = toIsoDateString(ebayTransaction.transactionDate);
+      return [
+        ...messages,
+        {
+          body: {
+            source: ACCOUNTING_SOURCE__EBAY,
+            sourceTransactionId: `${baseSourceTransactionId}-sale`,
+            transactionDate: transactionDate,
+            creditedAccount: ACCOUNT_NAME__SALES,
+            debitedAccount: ACCOUNT_NAME__EBAY,
+            skuOrPurchaseId: item.SKU,
+            amount: lineItem.feeBasisAmount.value,
+            description: item.Title,
+            who: `eBay: ${ebayTransaction.buyer.username}`,
+          },
+          attributes: { ...MESSAGE_TYPE__TRANSACTION },
+        },
+        ...lineItem.marketplaceFees.map((fee) => {
+          const feeData = EBAY_FEE_DATA[fee.feeType];
+          return {
+            body: {
+              source: ACCOUNTING_SOURCE__EBAY,
+              sourceTransactionId: `${baseSourceTransactionId}-${feeData.code}`,
+              transactionDate: transactionDate,
+              creditedAccount: ACCOUNT_NAME__EBAY,
+              debitedAccount: ACCOUNT_NAME__TRANSACTION_FEES,
+              skuOrPurchaseId: item.SKU,
+              amount: fee.amount.value,
+              description: feeData.description,
+              who: "eBay",
+            },
+            attributes: { ...MESSAGE_TYPE__TRANSACTION },
+          };
+        }),
+      ];
+    },
+    [
       {
-        source: ACCOUNTING_SOURCE__EBAY,
-        sourceTransactionId: `${baseSourceTransactionId}-sale`,
-        transactionDate: transactionDate,
-        creditedAccount: ACCOUNT_NAME__SALES,
-        debitedAccount: ACCOUNT_NAME__EBAY,
-        skuOrPurchaseId: item.SKU,
-        amount: lineItem.feeBasisAmount.value,
-        description: item.Title,
-        who: `eBay: ${ebayTransaction.buyer.username}`,
-      },
-      ...lineItem.marketplaceFees.map((fee) => {
-        const feeData = EBAY_FEE_DATA[fee.feeType];
-        return {
+        body: {
           source: ACCOUNTING_SOURCE__EBAY,
-          sourceTransactionId: `${baseSourceTransactionId}-${feeData.code}`,
-          transactionDate: transactionDate,
-          creditedAccount: ACCOUNT_NAME__EBAY,
-          debitedAccount: ACCOUNT_NAME__TRANSACTION_FEES,
-          skuOrPurchaseId: item.SKU,
-          amount: fee.amount.value,
-          description: feeData.description,
-          who: "eBay",
-        };
-      }),
-    ];
-  }, []);
+          sourceTransactionId: `${ebayTransaction.transactionId}-delivery`,
+          sku: item.SKU,
+          deliveryDate:
+            order.ShippingServiceSelected.ShippingPackageInfo
+              .ActualDeliveryTime,
+        },
+        attributes: { ...MESSAGE_TYPE__DELIVERY_NOTIFICATION },
+      },
+    ]
+  );
 };
 const extractShippingLabelTransactions = async (ebayTransaction) => {
   const ebayOrderResponse = await ebayClient.trading.GetOrders({
@@ -126,17 +164,20 @@ const extractShippingLabelTransactions = async (ebayTransaction) => {
   const item = order.TransactionArray.Transaction[0].Item;
   return [
     {
-      source: ACCOUNTING_SOURCE__EBAY,
-      sourceTransactionId: ebayTransaction.transactionId,
-      transactionDate: toIsoDateString(ebayTransaction.transactionDate),
-      creditedAccount: ACCOUNT_NAME__EBAY,
-      debitedAccount: ACCOUNT_NAME__OUTWARD_SHIPPING,
-      skuOrPurchaseId: item.SKU,
-      amount: ebayTransaction.amount.value,
-      description:
-        orderTransaction.ShippingDetails.ShipmentTrackingDetails
-          .ShippingCarrierUsed,
-      who: "eBay",
+      body: {
+        source: ACCOUNTING_SOURCE__EBAY,
+        sourceTransactionId: ebayTransaction.transactionId,
+        transactionDate: toIsoDateString(ebayTransaction.transactionDate),
+        creditedAccount: ACCOUNT_NAME__EBAY,
+        debitedAccount: ACCOUNT_NAME__OUTWARD_SHIPPING,
+        skuOrPurchaseId: item.SKU,
+        amount: ebayTransaction.amount.value,
+        description:
+          orderTransaction.ShippingDetails.ShipmentTrackingDetails
+            .ShippingCarrierUsed,
+        who: "eBay",
+      },
+      attributes: { ...MESSAGE_TYPE__TRANSACTION },
     },
   ];
 };
