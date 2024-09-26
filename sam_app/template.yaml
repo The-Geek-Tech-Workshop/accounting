@@ -21,122 +21,28 @@ Globals:
       - x86_64
 
 Resources:
-  DeliveryStatusLogger:
-    Type: AWS::IAM::Role
-    Properties:
-      Policies:
-        - PolicyName: DeliveryStatusLoggerPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:*
-                Resource: "*"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - sns.amazonaws.com
-            Action:
-              - sts:AssumeRole
-  AccountingEntryTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      DeliveryStatusLogging:
-        - Protocol: sqs
-          SuccessFeedbackSampleRate: "0"
-          SuccessFeedbackRoleArn: !GetAtt DeliveryStatusLogger.Arn
-          FailureFeedbackRoleArn: !GetAtt DeliveryStatusLogger.Arn
-    Connectors:
-      SheetsWriterQueueConnector:
-        Properties:
-          Destination:
-            Id: SheetsWriterQueue
-          Permissions:
-            - Write
-      EbayOrderEnricherQueueConnector:
-        Properties:
-          Destination:
-            Id: EbayOrderEnricherQueue
-          Permissions:
-            - Write
-      EbayPayoutEnricherQueueConnector:
-        Properties:
-          Destination:
-            Id: EbayPayoutEnricherQueue
-          Permissions:
-            - Write
-  EbayOrderEnricherQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      ReceiveMessageWaitTimeSeconds: 20
-  EbayPayoutEnricherQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      ReceiveMessageWaitTimeSeconds: 20
-  SheetsWriterQueue:
-    Properties:
-      ReceiveMessageWaitTimeSeconds: 20
-    Type: AWS::SQS::Queue
-  SheetsWriterAccountingEntrySubscription:
-    Type: AWS::SNS::Subscription
-    Properties:
-      Protocol: sqs
-      TopicArn: !Ref AccountingEntryTopic
-      Endpoint: !GetAtt SheetsWriterQueue.Arn
-      RawMessageDelivery: true
-      FilterPolicyScope: MessageAttributes
-      FilterPolicy:
-        {
-          "eBayOrderId": [{ "exists": false }],
-          "eBayPayoutId": [{ "exists": false }],
-        }
-  EbayOrderEnricherAccountingEntrySubscription:
-    Type: AWS::SNS::Subscription
-    Properties:
-      Protocol: sqs
-      TopicArn: !Ref AccountingEntryTopic
-      Endpoint: !GetAtt EbayOrderEnricherQueue.Arn
-      RawMessageDelivery: true
-      FilterPolicyScope: MessageAttributes
-      FilterPolicy: { "eBayOrderId": [{ "exists": true }] }
-  EbayPayoutEnricherAccountingEntrySubscription:
-    Type: AWS::SNS::Subscription
-    Properties:
-      Protocol: sqs
-      TopicArn: !Ref AccountingEntryTopic
-      Endpoint: !GetAtt EbayPayoutEnricherQueue.Arn
-      RawMessageDelivery: true
-      FilterPolicyScope: MessageAttributes
-      FilterPolicy: { "eBayPayoutId": [{ "exists": true }] }
-  StarlingVerifiedFeedItemQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      ReceiveMessageWaitTimeSeconds: 20
-  StarlingPersonalFeedItemWebhook:
+  EventSplitter:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: starling_feed_item_webhook/
-      Environment:
-        Variables:
-          PUBLIC_KEY: !Ref StarlingPersonalPublicKey
-          QUEUE_URL: !GetAtt StarlingVerifiedFeedItemQueue.QueueUrl
+      CodeUri: event_splitter/
       Events:
-        StarlingFeedItem:
-          Type: Api
+        AccountingEvents:
+          Type: EventBridgeRule
           Properties:
-            Path: /starling/feed-item
-            Method: post
+            Pattern:
+              source:
+                - "lambda"
+              detail-type:
+                - "Lambda Function Invocation Result - Success"
     Connectors:
-      OutgoingQueueConnector:
+      OutgoingTopicConnector:
         Properties:
           Destination:
-            Id: StarlingVerifiedFeedItemQueue
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
           Permissions:
             - Write
+
   StarlingBusinessFeedItemWebhook:
     Type: AWS::Serverless::Function
     Properties:
@@ -144,7 +50,6 @@ Resources:
       Environment:
         Variables:
           PUBLIC_KEY: !Ref StarlingBusinessPublicKey
-          QUEUE_URL: !GetAtt StarlingVerifiedFeedItemQueue.QueueUrl
       Events:
         StarlingFeedItem:
           Type: Api
@@ -152,87 +57,33 @@ Resources:
             Path: /starling/business/feed-item
             Method: post
     Connectors:
-      OutgoingQueueConnector:
+      OutgoingTopicConnector:
         Properties:
           Destination:
-            Id: StarlingVerifiedFeedItemQueue
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
           Permissions:
             - Write
+
   StarlingFeedItemToTransaction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: starling_feed_item_to_transaction/
-      Environment:
-        Variables:
-          TOPIC_ARN: !GetAtt AccountingEntryTopic.TopicArn
       Events:
-        VerifiedStarlingFeedItem:
-          Type: SQS
+        VerifiedStarlingFeedItemEventRule:
+          Type: EventBridgeRule
           Properties:
-            Queue: !GetAtt StarlingVerifiedFeedItemQueue.Arn
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Id: AccountingEntryTopic
-          Permissions:
-            - Write
-      IncomingQueueConnector:
-        Properties:
-          Destination:
-            Id: StarlingVerifiedFeedItemQueue
-          Permissions:
-            - Read
-  StarlingEbayOrderEnricher:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay_order_enricher/
-      Environment:
-        Variables:
-          QUEUE_URL: !GetAtt SheetsWriterQueue.QueueUrl
-      Events:
-        AccountsEntry:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt EbayOrderEnricherQueue.Arn
-    Connectors:
-      IncomingQueueConnector:
-        Properties:
-          Destination:
-            Id: EbayOrderEnricherQueue
-          Permissions:
-            - Read
-      OutgoingQueueConnector:
-        Properties:
-          Destination:
-            Id: SheetsWriterQueue
-          Permissions:
-            - Write
-  StarlingEbayPayoutEnricher:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay_payout_enricher/
-      Environment:
-        Variables:
-          QUEUE_URL: !GetAtt SheetsWriterQueue.QueueUrl
-      Events:
-        AccountsEntry:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt EbayPayoutEnricherQueue.Arn
-    Connectors:
-      IncomingQueueConnector:
-        Properties:
-          Destination:
-            Id: EbayPayoutEnricherQueue
-          Permissions:
-            - Read
-      OutgoingQueueConnector:
-        Properties:
-          Destination:
-            Id: SheetsWriterQueue
-          Permissions:
-            - Write
+            Pattern:
+              source:
+                - "custom.gtw.accountingApp"
+              detail-type:
+                - "starling-verified-feeditem"
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
   SheetsWriter:
     Type: AWS::Serverless::Function
     Properties:
@@ -242,14 +93,57 @@ Resources:
           SPREADSHEET_ID: !Ref SpreadsheetId
           GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
       Events:
-        AccountsEntry:
-          Type: SQS
+        NewTransactionEventRule:
+          Type: EventBridgeRule
           Properties:
-            Queue: !GetAtt SheetsWriterQueue.Arn
-    Connectors:
-      IncomingQueueConnector:
-        Properties:
-          Destination:
-            Id: SheetsWriterQueue
-          Permissions:
-            - Read
+            Pattern:
+              detail-type:
+                - transaction
+              detail:
+                MessageAttributes:
+                  eBayOrderId:
+                    - { "exists": false }
+                  eBayPayoutId:
+                    - { "exists": false }
+
+  StarlingEbayOrderEnricher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay_order_enricher/
+      Events:
+        NewEbayOrderTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - transaction
+              detail:
+                MessageAttributes:
+                  eBayOrderId:
+                    - { "exists": true }
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  StarlingEbayPayoutEnricher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay_payout_enricher/
+      Events:
+        NewEbayPayoutTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - transaction
+              detail:
+                MessageAttributes:
+                  eBayPayoutId:
+                    - { "exists": true }
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default

@@ -1,4 +1,3 @@
-import AWS from "aws-sdk";
 import dateFormat from "dateformat";
 import ebayClientBuilder from "gtw-ebay-client";
 
@@ -46,53 +45,50 @@ const ebayClient = await ebayClientBuilder(
   `${import.meta.dirname}/ebay-auth.json`
 );
 
-const sqs = new AWS.SQS();
-
 export const lambdaHandler = async (event) => {
-  for (const record of event.Records) {
-    const transaction = JSON.parse(record.body);
-    const ebayPayoutId = record.messageAttributes.eBayPayoutId.stringValue;
-    const eBayTransactionsResponse =
-      await ebayClient.sell.finances.sign.getTransactions({
-        filter: `payoutId:{${ebayPayoutId}}`,
-      });
-    const messages = await eBayTransactionsResponse.transactions.reduce(
-      async (messagesSoFarP, ebayTransaction) => {
-        const messagesSoFar = await messagesSoFarP;
+  const transaction = JSON.parse(event.detail.Message);
+  const ebayPayoutId = event.detail.MessageAttributes.eBayPayoutId;
+  const eBayTransactionsResponse =
+    await ebayClient.sell.finances.sign.getTransactions({
+      filter: `payoutId:{${ebayPayoutId}}`,
+    });
+  const messages = await eBayTransactionsResponse.transactions.reduce(
+    async (messagesSoFarP, ebayTransaction) => {
+      const messagesSoFar = await messagesSoFarP;
 
-        const newMessages =
-          ebayTransaction.transactionType === EBAY_TRANSACTION_TYPE__SALE
-            ? await extractSaleTransactions(ebayTransaction)
-            : ebayTransaction.transactionType ===
-              EBAY_TRANSACTION_TYPE__SHIPPING_LABEL
-            ? await extractShippingLabelTransactions(ebayTransaction)
-            : [];
-        return Promise.resolve([...messagesSoFar, ...newMessages]);
-      },
-      Promise.resolve([
-        {
-          body: {
-            ...transaction,
-            creditedAccount: ACCOUNT_NAME__EBAY,
-            description: `Payout ${ebayPayoutId}`,
-          },
-          attributes: { ...MESSAGE_TYPE__TRANSACTION },
+      const newMessages =
+        ebayTransaction.transactionType === EBAY_TRANSACTION_TYPE__SALE
+          ? await extractSaleTransactions(ebayTransaction)
+          : ebayTransaction.transactionType ===
+            EBAY_TRANSACTION_TYPE__SHIPPING_LABEL
+          ? await extractShippingLabelTransactions(ebayTransaction)
+          : [];
+      return Promise.resolve([...messagesSoFar, ...newMessages]);
+    },
+    Promise.resolve([
+      {
+        body: {
+          ...transaction,
+          creditedAccount: ACCOUNT_NAME__EBAY,
+          description: `Payout ${ebayPayoutId}`,
         },
-      ])
-    );
-    const messageBatch = {
-      Entries: messages.map((message) => {
-        return {
-          Id: `${message.body.source}-${message.body.sourceTransactionId}`,
-          MessageBody: JSON.stringify(message.body),
+        attributes: { ...MESSAGE_TYPE__TRANSACTION },
+      },
+    ])
+  );
+  const newMessages = {
+    Messages: messages.map((message) => {
+      return {
+        Detail: {
+          Message: JSON.stringify(message.body),
           MessageAttributes: message.attributes,
-        };
-      }),
-      QueueUrl: QUEUE_URL,
-    };
-    // console.log(JSON.stringify(messageBatch));
-    await sqs.sendMessageBatch(messageBatch).promise();
-  }
+        },
+        DetailType: "transaction",
+      };
+    }),
+  };
+
+  return newMessages;
 };
 const extractSaleTransactions = async (ebayTransaction) => {
   const ebayOrderResponse = await ebayClient.trading.GetOrders({
