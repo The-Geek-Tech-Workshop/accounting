@@ -1,13 +1,15 @@
 import { createPublicKey, verify } from "crypto";
-import AWS from "aws-sdk";
+import {
+  EventBridgeClient,
+  PutEventsCommand,
+} from "@aws-sdk/client-eventbridge";
 
 const PUBLIC_KEY = createPublicKey(
   `-----BEGIN PUBLIC KEY-----\n${process.env.PUBLIC_KEY}\n-----END PUBLIC KEY-----`
 );
 const ENCRYPTION_ALGORITHM = "RSA-SHA512";
-const QUEUE_URL = process.env.QUEUE_URL;
 
-const sqs = new AWS.SQS();
+const eventBridgeClient = new EventBridgeClient();
 
 export const lambdaHandler = async (event) => {
   console.log(JSON.stringify(event));
@@ -15,12 +17,17 @@ export const lambdaHandler = async (event) => {
   const verified = verifyEvent(event);
 
   if (verified) {
-    await sqs
-      .sendMessage({
-        MessageBody: event.body,
-        QueueUrl: QUEUE_URL,
+    await eventBridgeClient.send(
+      new PutEventsCommand({
+        Entries: [
+          {
+            Detail: event.body,
+            DetailType: "starling-verified-feeditem",
+            Source: "custom.gtw.accountingApp",
+          },
+        ],
       })
-      .promise();
+    );
   } else {
     console.error("Message verification failed");
   }

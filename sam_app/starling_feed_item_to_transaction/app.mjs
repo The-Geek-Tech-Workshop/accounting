@@ -1,5 +1,4 @@
 import dateFormat from "dateformat";
-import AWS from "aws-sdk";
 import { readFile } from "fs/promises";
 
 const ISO_DATE_MASK = "isoDate";
@@ -13,32 +12,39 @@ const STARLING_ACCOUNT_TO_BANK_ACCOUNT_NAME_MAPPING = {
 };
 const SKU_OR_PURCHASE_ID__NA = "N/A";
 const STARLING_SOURCE = "STARLING";
-const TOPIC_ARN = process.env.TOPIC_ARN;
 const STARLING_EBAY_NAMES = ["eBay", "EBAY Commerce UK Ltd"];
 
 const STARLING_TRANSACTION_STATUS__DECLINED = "DECLINED";
 
 const ebayOrderIdRegex = /^eBay O\*(?<orderId>.+)$/gm;
 const ebayPayoutIdRegex = /^P\*(?<payoutId>.+)$/gm;
-const sns = new AWS.SNS();
 
 const personalData = JSON.parse(
   await readFile(new URL("personal.json", import.meta.url))
 );
 
 export const lambdaHandler = async (event) => {
-  for (const record of event.Records) {
-    const webhook = JSON.parse(record.body);
-    const feedItem = webhook.content;
-    if (feedItem.status !== STARLING_TRANSACTION_STATUS__DECLINED) {
-      await extractAndSendTransaction(webhook.accountHolderUid, feedItem);
-    } else {
-      console.log("Transaction skipped: declined");
-    }
+  const webhook = event.detail;
+  const feedItem = webhook.content;
+
+  if (feedItem.status === STARLING_TRANSACTION_STATUS__DECLINED) {
+    console.log("Transaction skipped: declined");
+    return;
   }
+  const newTransaction = await extractTransaction(
+    webhook.accountHolderUid,
+    feedItem
+  );
+
+  const outgoing = {
+    Messages: [newTransaction],
+  };
+
+  console.log(JSON.stringify(outgoing));
+  return outgoing;
 };
 
-const extractAndSendTransaction = async (accountHolderUid, feedItem) => {
+const extractTransaction = async (accountHolderUid, feedItem) => {
   const transactionId = `${STARLING_SOURCE}-${feedItem.feedItemUid}`;
   const transactionWasOutgoing = feedItem.direction === "OUT";
   const starlingAccountName =
@@ -68,27 +74,26 @@ const extractAndSendTransaction = async (accountHolderUid, feedItem) => {
   const ebayHeaders = extractEbayHeaders(transactionWasOutgoing, feedItem);
 
   const message = {
-    Message: JSON.stringify({
-      source: STARLING_SOURCE,
-      sourceTransactionId: feedItem.feedItemUid,
-      transactionDate: toIsoDateString(feedItem.transactionTime),
-      creditedAccount: creditedAccount,
-      debitedAccount: debitedAccount,
-      skuOrPurchaseId: skuOrPurchaseId,
-      amount: feedItem.amount.minorUnits / 100,
-      description: feedItem.reference,
-      who: feedItem.counterPartyName,
-    }),
-    MessageAttributes: {
-      transactionId: {
-        DataType: "String",
-        StringValue: transactionId,
+    Detail: {
+      Message: JSON.stringify({
+        source: STARLING_SOURCE,
+        sourceTransactionId: feedItem.feedItemUid,
+        transactionDate: toIsoDateString(feedItem.transactionTime),
+        creditedAccount: creditedAccount,
+        debitedAccount: debitedAccount,
+        skuOrPurchaseId: skuOrPurchaseId,
+        amount: feedItem.amount.minorUnits / 100,
+        description: feedItem.reference,
+        who: feedItem.counterPartyName,
+      }),
+      MessageAttributes: {
+        transactionId: transactionId,
+        ...ebayHeaders,
       },
-      ...ebayHeaders,
     },
-    TopicArn: TOPIC_ARN,
+    DetailType: "transaction",
   };
-  await sns.publish(message).promise();
+  return message;
 };
 
 const extractEbayHeaders = (transactionWasOutgoing, feedItem) => {
@@ -99,10 +104,7 @@ const extractEbayHeaders = (transactionWasOutgoing, feedItem) => {
     STARLING_EBAY_NAMES.includes(feedItem.counterPartyName) &&
     ebayOrderIdMatch
       ? {
-          eBayOrderId: {
-            DataType: "String",
-            StringValue: ebayOrderIdMatch.groups.orderId,
-          },
+          eBayOrderId: ebayOrderIdMatch.groups.orderId,
         }
       : {};
 
@@ -112,10 +114,7 @@ const extractEbayHeaders = (transactionWasOutgoing, feedItem) => {
     STARLING_EBAY_NAMES.includes(feedItem.counterPartyName) &&
     ebayPayoutIdMatch
       ? {
-          eBayPayoutId: {
-            DataType: "String",
-            StringValue: ebayPayoutIdMatch.groups.payoutId,
-          },
+          eBayPayoutId: ebayPayoutIdMatch.groups.payoutId,
         }
       : {};
   return {

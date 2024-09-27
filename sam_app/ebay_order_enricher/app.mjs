@@ -1,7 +1,4 @@
-import AWS from "aws-sdk";
 import ebayClientBuilder from "gtw-ebay-client";
-
-const QUEUE_URL = process.env.QUEUE_URL;
 
 const INWARD_SHIPPING_ACCOUNT_NAME = "Inward Shipping";
 
@@ -10,31 +7,29 @@ const VAT_TAX_PERCENTAGE = 20;
 const ebayClient = await ebayClientBuilder(
   `${import.meta.dirname}/ebay-auth.json`
 );
-const sqs = new AWS.SQS();
 
 export const lambdaHandler = async (event) => {
-  for (const record of event.Records) {
-    const transaction = JSON.parse(record.body);
-    const ebayOrderId = record.messageAttributes.eBayOrderId.stringValue;
+  const transaction = JSON.parse(event.detail.Message);
+  const ebayOrderId = event.detail.MessageAttributes.eBayOrderId;
 
-    const ebayOrderResponse = await ebayClient.trading.GetOrders({
-      OrderIDArray: [{ OrderID: ebayOrderId }],
-    });
+  const ebayOrderResponse = await ebayClient.trading.GetOrders({
+    OrderIDArray: [{ OrderID: ebayOrderId }],
+  });
 
-    const order = ebayOrderResponse.OrderArray.Order[0];
-    const item = order.TransactionArray.Transaction[0];
-    const who = `eBay: ${order.SellerUserID}`;
+  const order = ebayOrderResponse.OrderArray.Order[0];
+  const item = order.TransactionArray.Transaction[0];
+  const who = `eBay: ${order.SellerUserID}`;
 
-    const costsIncludeVat = !!(item.Taxes.TotalTaxAmount.value === 0);
+  const costsIncludeVat = !!(item.Taxes.TotalTaxAmount.value === 0);
 
-    const getCost = (amount) => (costsIncludeVat ? amount : addVAT(amount));
+  const getCost = (amount) => (costsIncludeVat ? amount : addVAT(amount));
 
-    const additionalMessages =
-      order.ShippingServiceSelected.ShippingServiceCost.value > 0
-        ? [
-            {
-              Id: "shipping",
-              MessageBody: JSON.stringify({
+  const additionalMessages =
+    order.ShippingServiceSelected.ShippingServiceCost.value > 0
+      ? [
+          {
+            Detail: {
+              Message: JSON.stringify({
                 ...transaction,
                 sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
                 debitedAccount: INWARD_SHIPPING_ACCOUNT_NAME,
@@ -45,28 +40,26 @@ export const lambdaHandler = async (event) => {
                 who: who,
               }),
             },
-          ]
-        : [];
-    const messages = [
-      {
-        Id: "item",
-        MessageBody: JSON.stringify({
+            DetailType: "transaction",
+          },
+        ]
+      : [];
+  const messages = [
+    {
+      Detail: {
+        Message: JSON.stringify({
           ...transaction,
           amount: getCost(item.TransactionPrice.value),
           description: item.Item.Title,
           who: who,
         }),
       },
-      ...additionalMessages,
-    ];
+      DetailType: "transaction",
+    },
+    ...additionalMessages,
+  ];
 
-    await sqs
-      .sendMessageBatch({
-        Entries: messages,
-        QueueUrl: QUEUE_URL,
-      })
-      .promise();
-  }
+  return { Messages: messages };
 };
 
 const addVAT = (costWithoutVAT) =>

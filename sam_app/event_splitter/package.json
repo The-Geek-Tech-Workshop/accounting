@@ -1,0 +1,14 @@
+{
+  "name": "event_splitter",
+  "version": "1.0.0",
+  "main": "app.mjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andrew Todd",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-eventbridge": "^3.658.1"
+  }
+}

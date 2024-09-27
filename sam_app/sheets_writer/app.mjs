@@ -33,124 +33,122 @@ const creditedAccountAssetLookupFunction = existingRow[2];
 const debitedAccountAssetLookupFunction = existingRow[4];
 
 export const lambdaHandler = async (event) => {
-  for (const record of event.Records) {
-    const transaction = JSON.parse(record.body);
-    const transactionId = `${transaction.source}-${transaction.sourceTransactionId}`;
-    console.log(`Transaction: ${transactionId}`);
+  const transaction = JSON.parse(event.detail.Message);
+  const transactionId = `${transaction.source}-${transaction.sourceTransactionId}`;
+  console.log(`Transaction: ${transactionId}`);
 
-    if (await doesTransactionAlreadyExist(transactionId)) {
-      console.log(`Transaction ${transactionId} already exists. Skipping...`);
-      continue;
-    }
-
-    const createNewRowRequest = {
-      insertDimension: {
-        range: {
-          sheetId: transactionsSheetId,
-          dimension: "ROWS",
-          startIndex: NEW_ROW_NUMBER - 1,
-          endIndex: NEW_ROW_NUMBER,
-        },
-        inheritFromBefore: true,
-      },
-    };
-
-    const updateCellsRequest = {
-      updateCells: {
-        range: {
-          sheetId: transactionsSheetId,
-          startRowIndex: NEW_ROW_NUMBER - 1,
-          endRowIndex: NEW_ROW_NUMBER,
-        },
-        fields: "userEnteredValue",
-        rows: [
-          {
-            values: [
-              {
-                userEnteredValue: {
-                  numberValue: serialNumberFormatDate(
-                    new Date(transaction.transactionDate)
-                  ),
-                },
-              },
-              {
-                userEnteredValue: { stringValue: transaction.creditedAccount },
-              },
-              {
-                userEnteredValue: {
-                  formulaValue: creditedAccountAssetLookupFunction,
-                },
-              },
-              {
-                userEnteredValue: { stringValue: transaction.debitedAccount },
-              },
-              {
-                userEnteredValue: {
-                  formulaValue: debitedAccountAssetLookupFunction,
-                },
-              },
-              {
-                userEnteredValue: { numberValue: transaction.amount },
-              },
-              {
-                userEnteredValue: { stringValue: transaction.skuOrPurchaseId },
-              },
-              {
-                userEnteredValue: { stringValue: transaction.description },
-              },
-              {
-                userEnteredValue: { stringValue: transaction.who },
-              },
-            ],
-          },
-        ],
-      },
-    };
-
-    const createDeveloperMetadataRequest = {
-      createDeveloperMetadata: {
-        developerMetadata: {
-          metadataKey: TRANSACTION_ID_METADATA_KEY,
-          metadataValue: transactionId,
-          location: {
-            dimensionRange: {
-              sheetId: transactionsSheetId,
-              dimension: "ROWS",
-              startIndex: NEW_ROW_NUMBER - 1,
-              endIndex: NEW_ROW_NUMBER,
-            },
-          },
-          visibility: "DOCUMENT",
-        },
-      },
-    };
-
-    const sortRowsRequest = {
-      sortRange: {
-        range: {
-          sheetId: transactionsSheetId,
-        },
-        sortSpecs: [
-          {
-            dimensionIndex: 0,
-            sortOrder: "DESCENDING",
-          },
-        ],
-      },
-    };
-
-    await sheetsApi.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      resource: {
-        requests: [
-          createNewRowRequest,
-          updateCellsRequest,
-          createDeveloperMetadataRequest,
-          sortRowsRequest,
-        ],
-      },
-    });
+  if (await doesTransactionAlreadyExist(transactionId)) {
+    console.log(`Transaction ${transactionId} already exists. Skipping...`);
+    return;
   }
+
+  const createNewRowRequest = {
+    insertDimension: {
+      range: {
+        sheetId: transactionsSheetId,
+        dimension: "ROWS",
+        startIndex: NEW_ROW_NUMBER - 1,
+        endIndex: NEW_ROW_NUMBER,
+      },
+      inheritFromBefore: true,
+    },
+  };
+
+  const updateCellsRequest = {
+    updateCells: {
+      range: {
+        sheetId: transactionsSheetId,
+        startRowIndex: NEW_ROW_NUMBER - 1,
+        endRowIndex: NEW_ROW_NUMBER,
+      },
+      fields: "userEnteredValue",
+      rows: [
+        {
+          values: [
+            {
+              userEnteredValue: {
+                numberValue: serialNumberFormatDate(
+                  new Date(transaction.transactionDate)
+                ),
+              },
+            },
+            {
+              userEnteredValue: { stringValue: transaction.creditedAccount },
+            },
+            {
+              userEnteredValue: {
+                formulaValue: creditedAccountAssetLookupFunction,
+              },
+            },
+            {
+              userEnteredValue: { stringValue: transaction.debitedAccount },
+            },
+            {
+              userEnteredValue: {
+                formulaValue: debitedAccountAssetLookupFunction,
+              },
+            },
+            {
+              userEnteredValue: { numberValue: transaction.amount },
+            },
+            {
+              userEnteredValue: { stringValue: transaction.skuOrPurchaseId },
+            },
+            {
+              userEnteredValue: { stringValue: transaction.description },
+            },
+            {
+              userEnteredValue: { stringValue: transaction.who },
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  const createDeveloperMetadataRequest = {
+    createDeveloperMetadata: {
+      developerMetadata: {
+        metadataKey: TRANSACTION_ID_METADATA_KEY,
+        metadataValue: transactionId,
+        location: {
+          dimensionRange: {
+            sheetId: transactionsSheetId,
+            dimension: "ROWS",
+            startIndex: NEW_ROW_NUMBER - 1,
+            endIndex: NEW_ROW_NUMBER,
+          },
+        },
+        visibility: "DOCUMENT",
+      },
+    },
+  };
+
+  const sortRowsRequest = {
+    sortRange: {
+      range: {
+        sheetId: transactionsSheetId,
+      },
+      sortSpecs: [
+        {
+          dimensionIndex: 0,
+          sortOrder: "DESCENDING",
+        },
+      ],
+    },
+  };
+
+  await sheetsApi.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    resource: {
+      requests: [
+        createNewRowRequest,
+        updateCellsRequest,
+        createDeveloperMetadataRequest,
+        sortRowsRequest,
+      ],
+    },
+  });
 };
 
 const doesTransactionAlreadyExist = async (transactionId) => {
