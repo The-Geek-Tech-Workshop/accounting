@@ -1,0 +1,15 @@
+{
+  "name": "ebay_api_caller",
+  "version": "1.0.0",
+  "main": "app.mjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andrew Todd",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "gtw-ebay-client": "file:../gtw-ebay-client/gtw-ebay-client-1.0.0.tgz"
+  }
+}

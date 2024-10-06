@@ -2,7 +2,6 @@ import dateFormat from "dateformat";
 import ebayClientBuilder from "gtw-ebay-client";
 
 const ISO_DATE_MASK = "isoDate";
-const QUEUE_URL = process.env.QUEUE_URL;
 
 const ACCOUNTING_SOURCE__EBAY = "EBAY";
 const ACCOUNT_NAME__SALES = "Sales";
@@ -97,6 +96,10 @@ const extractSaleTransactions = async (ebayTransaction) => {
   const order = ebayOrderResponse.OrderArray.Order[0];
   const item = order.TransactionArray.Transaction[0].Item;
 
+  const deliveryDate = order.ShippingServiceSelected.ShippingPackageInfo
+    ? order.ShippingServiceSelected.ShippingPackageInfo.ActualDeliveryTime
+    : null;
+
   return ebayTransaction.orderLineItems.reduce(
     (messages, lineItem) => {
       const baseSourceTransactionId = `${ebayTransaction.transactionId}-${lineItem.lineItemId}`;
@@ -136,19 +139,21 @@ const extractSaleTransactions = async (ebayTransaction) => {
         }),
       ];
     },
-    [
-      {
-        body: {
-          source: ACCOUNTING_SOURCE__EBAY,
-          sourceTransactionId: `${ebayTransaction.transactionId}-delivery`,
-          sku: item.SKU,
-          deliveryDate:
-            order.ShippingServiceSelected.ShippingPackageInfo
-              .ActualDeliveryTime,
-        },
-        attributes: { ...MESSAGE_TYPE__DELIVERY_NOTIFICATION },
-      },
-    ]
+    deliveryDate
+      ? [
+          {
+            body: {
+              source: ACCOUNTING_SOURCE__EBAY,
+              sourceTransactionId: `${ebayTransaction.transactionId}-delivery`,
+              sku: item.SKU,
+              deliveryDate:
+                order.ShippingServiceSelected.ShippingPackageInfo
+                  .ActualDeliveryTime,
+            },
+            attributes: { ...MESSAGE_TYPE__DELIVERY_NOTIFICATION },
+          },
+        ]
+      : []
   );
 };
 const extractShippingLabelTransactions = async (ebayTransaction) => {
