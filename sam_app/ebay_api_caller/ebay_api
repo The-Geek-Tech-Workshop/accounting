@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import ebayClientBuilder from "gtw-ebay-client";
 import { program } from "commander";
 
@@ -6,6 +8,7 @@ program
   .usage("OPTIONS...")
   .option("-p, --payout <string>", "Interogate a payout")
   .option("-o --order <string>", "Interrogate an order Id")
+  .option("-i --item <string>", "Interrogate an item Id")
   .parse(process.argv);
 
 const options = program.opts();
@@ -24,6 +27,11 @@ if (options.payout) {
 } else if (options.order) {
   const ebayOrderResponse = await ebayClient.trading.GetOrders({
     OrderIDArray: [{ OrderID: options.order }],
+  });
+  console.log(JSON.stringify(ebayOrderResponse, null, 4));
+} else if (options.item) {
+  const ebayOrderResponse = await ebayClient.trading.GetItem({
+    ItemID: options.item,
   });
   console.log(JSON.stringify(ebayOrderResponse, null, 4));
 }

@@ -8,9 +8,13 @@ const ACCOUNT_NAME__SALES = "Sales";
 const ACCOUNT_NAME__EBAY = "eBay (GTW)";
 const ACCOUNT_NAME__OUTWARD_SHIPPING = "Outward Shipping";
 const ACCOUNT_NAME__TRANSACTION_FEES = "Transaction Fees";
+const ACCOUNT_NAME__LISTING_FEES = "Listing Fees";
 
 const EBAY_TRANSACTION_TYPE__SALE = "SALE";
 const EBAY_TRANSACTION_TYPE__SHIPPING_LABEL = "SHIPPING_LABEL";
+const EBAY_TRANSACTION_TYPE__NON_SALE_CHARGE = "NON_SALE_CHARGE";
+
+const EBAY_NON_SALE_CHARGE__INSERTION_FEE = "INSERTION_FEE";
 
 const MESSAGE_TYPE__TRANSACTION = {
   messageType: {
@@ -38,6 +42,10 @@ const EBAY_FEE_DATA = {
     code: "finalVar",
     description: "Final value fee (variable per order)",
   },
+  INSERTION_FEE: {
+    code: "insertion",
+    description: "Insertion fee",
+  },
 };
 
 const ebayClient = await ebayClientBuilder(
@@ -61,6 +69,9 @@ export const lambdaHandler = async (event) => {
           : ebayTransaction.transactionType ===
             EBAY_TRANSACTION_TYPE__SHIPPING_LABEL
           ? await extractShippingLabelTransactions(ebayTransaction)
+          : ebayTransaction.transactionType ===
+            EBAY_TRANSACTION_TYPE__NON_SALE_CHARGE
+          ? await extractNonSaleCharge(ebayTransaction)
           : [];
       return Promise.resolve([...messagesSoFar, ...newMessages]);
     },
@@ -86,6 +97,8 @@ export const lambdaHandler = async (event) => {
       };
     }),
   };
+
+  console.log(JSON.stringify(newMessages));
 
   return newMessages;
 };
@@ -176,6 +189,36 @@ const extractShippingLabelTransactions = async (ebayTransaction) => {
         description:
           orderTransaction.ShippingDetails.ShipmentTrackingDetails
             .ShippingCarrierUsed,
+        who: "eBay",
+      },
+      attributes: { ...MESSAGE_TYPE__TRANSACTION },
+    },
+  ];
+};
+
+const extractNonSaleCharge = async (ebayTransaction) => {
+  return ebayTransaction.feeType === EBAY_NON_SALE_CHARGE__INSERTION_FEE
+    ? await extractInsertionFee(ebayTransaction)
+    : [];
+};
+
+const extractInsertionFee = async (ebayTransaction) => {
+  const ebayItemResponse = await ebayClient.trading.GetItem({
+    ItemID: ebayTransaction.references[0].referenceId,
+  });
+  const item = ebayItemResponse.Item;
+
+  return [
+    {
+      body: {
+        source: ACCOUNTING_SOURCE__EBAY,
+        sourceTransactionId: ebayTransaction.transactionId,
+        transactionDate: toIsoDateString(ebayTransaction.transactionDate),
+        creditedAccount: ACCOUNT_NAME__EBAY,
+        debitedAccount: ACCOUNT_NAME__LISTING_FEES,
+        skuOrPurchaseId: item.SKU,
+        amount: ebayTransaction.amount.value,
+        description: EBAY_FEE_DATA.INSERTION_FEE.description,
         who: "eBay",
       },
       attributes: { ...MESSAGE_TYPE__TRANSACTION },
