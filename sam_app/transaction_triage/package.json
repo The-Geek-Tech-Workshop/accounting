@@ -1,5 +1,5 @@
 {
-  "name": "ebay_transaction_to_gtw_transaction",
+  "name": "transaction_triage",
   "version": "1.0.0",
   "main": "app.mjs",
   "scripts": {
@@ -9,7 +9,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@aws-sdk/client-eventbridge": "^3.658.1",
     "accounting_constants": "file:../accounting_constants"
   }
 }

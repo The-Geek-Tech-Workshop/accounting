@@ -2,6 +2,7 @@ import {
   EventBridgeClient,
   PutEventsCommand,
 } from "@aws-sdk/client-eventbridge";
+import constants from "accounting_constants";
 
 const eventBridgeClient = new EventBridgeClient();
 
@@ -13,7 +14,7 @@ export const lambdaHandler = async (event) => {
       return {
         Detail: JSON.stringify(message.Detail),
         DetailType: message.DetailType,
-        Source: "custom.gtw.accountingApp",
+        Source: constants.MESSAGE.SOURCE.GTW_ACCOUNTING,
       };
     });
     const messageGroups = chunks(messages, EVENT_BRIDGE_MAX_ENTRIES);

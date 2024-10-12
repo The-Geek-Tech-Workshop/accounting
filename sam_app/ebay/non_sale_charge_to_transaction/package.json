@@ -1,0 +1,20 @@
+{
+  "name": "non_sale_charge_to_transaction",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "author": "Andrew Todd",
+  "scripts": {
+    "test": "mocha tests/unit/"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.4.2",
+    "chai": "^4.3.6",
+    "mocha": "^10.2.0"
+  },
+  "dependencies": {
+    "accounting_constants": "file:../../accounting_constants",
+    "gtw-ebay-client": "file:../gtw-ebay-client/gtw-ebay-client-1.0.0.tgz",
+    "luxon": "^3.5.0"
+  }
+}

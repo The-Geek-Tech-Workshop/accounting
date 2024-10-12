@@ -1,0 +1,84 @@
+#!/usr/bin/env node
+
+import ebayClientBuilder from "gtw-ebay-client";
+import { program } from "commander";
+
+const ebayClient = await ebayClientBuilder(
+  `${import.meta.dirname}/ebay-auth.json`
+);
+
+const handleTransactions = async ({
+  dateFrom,
+  dateTo,
+  type,
+  limit,
+  offset,
+}) => {
+  const dateFilter =
+    dateFrom || dateTo
+      ? `transactionDate:[${dateFrom ? dateFrom : ""}${
+          dateFrom && dateTo ? ".." : ""
+        }${dateTo ? dateTo : ""}]`
+      : null;
+  const typeFilter = type ? `transactionType:{${type}}` : null;
+
+  const filters = [dateFilter, typeFilter].filter((x) => x != null);
+
+  const eBayResponse = await ebayClient.sell.finances.sign.getTransactions({
+    ...(filters.length && { filter: filters.join("&") }),
+    ...(limit && { limit: limit }),
+    ...(offset && { offset: offset }),
+    sort: "transactionDate",
+  });
+  prettyPrintJson(eBayResponse);
+};
+
+program
+  .version("1.0.0", "-v, --version")
+  .usage("OPTIONS...")
+  .command("transactions")
+  .description("Retrieve transaction data")
+  .option("-i --id <string>", "Return a transaction by transaction-id")
+  .option("-f --date-from <string>", "Transactions from this date (ISO)")
+  .option("-t --date-to <string>", "Transactions up until this date (ISO)")
+  .option("-y --type <string>", "Transactions type")
+  .option("-o --offset <number>", "Results offset")
+  .option("-l --limit <number>", "Results limit")
+  .action(handleTransactions)
+  // .option("-p, --payout <string>", "Interogate a payout")
+  // .option("-o --order <string>", "Interrogate an order Id")
+  // .option("-i --item <string>", "Interrogate an item Id")
+  // .option("-t --transaction <string>", "Interrogate an transaction Id")
+  .parseAsync(process.argv);
+
+const options = program.opts();
+
+if (options.payout) {
+  console.log(`Requesting transactions for payout ${options.payout}`);
+  const eBayTransactionsResponse =
+    await ebayClient.sell.finances.sign.getTransactions({
+      filter: `payoutId:{${options.payout}}`,
+    });
+  console.log(JSON.stringify(eBayTransactionsResponse, null, 4));
+} else if (options.order) {
+  const ebayOrderResponse = await ebayClient.trading.GetOrders({
+    OrderIDArray: [{ OrderID: options.order }],
+  });
+  console.log(JSON.stringify(ebayOrderResponse, null, 4));
+} else if (options.item) {
+  const ebayOrderResponse = await ebayClient.trading.GetItem({
+    ItemID: options.item,
+  });
+  console.log(JSON.stringify(ebayOrderResponse, null, 4));
+} else if (options.transaction) {
+  const eBayResponse = await ebayClient.sell.finances.sign.getTransactions({
+    // filter: [
+    //   `transactionId:{${options.transaction}}`,
+    //   "transactionType:{SHIPPING_LABEL}",
+    // ],
+    filter: "transactionType:{SHIPPING_LABEL}",
+  });
+  console.log(JSON.stringify(eBayResponse, null, 4));
+}
+
+const prettyPrintJson = (json) => console.log(JSON.stringify(json, null, 4));

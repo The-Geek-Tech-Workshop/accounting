@@ -5,8 +5,6 @@ Description: >
 Parameters:
   SpreadsheetId:
     Type: String
-  StarlingPersonalPublicKey:
-    Type: String
   StarlingBusinessPublicKey:
     Type: String
   GoogleCredentialsFile:
@@ -46,7 +44,7 @@ Resources:
   StarlingBusinessFeedItemWebhook:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: starling_feed_item_webhook/
+      CodeUri: starling/feed_item_webhook/
       Environment:
         Variables:
           PUBLIC_KEY: !Ref StarlingBusinessPublicKey
@@ -68,7 +66,7 @@ Resources:
   StarlingFeedItemToTransaction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: starling_feed_item_to_transaction/
+      CodeUri: starling/feed_item_to_transaction/
       Events:
         VerifiedStarlingFeedItemEventRule:
           Type: EventBridgeRule
@@ -84,10 +82,27 @@ Resources:
             Type: EventBridge
             Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
 
-  SheetsWriter:
+  TransactionTriage:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: sheets_writer/
+      CodeUri: transaction_triage/
+      Events:
+        EbayTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - transaction
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  SheetsTransactionWriter:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: sheets/transaction_writer/
       Environment:
         Variables:
           SPREADSHEET_ID: !Ref SpreadsheetId
@@ -98,50 +113,146 @@ Resources:
           Properties:
             Pattern:
               detail-type:
-                - transaction
-              detail:
-                MessageAttributes:
-                  eBayOrderId:
-                    - { "exists": false }
-                  eBayPayoutId:
-                    - { "exists": false }
+                - triaged-transaction
 
-  StarlingEbayOrderEnricher:
+  EbayOrderEnricher:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ebay_order_enricher/
+      CodeUri: ebay/order_enricher/
       Events:
         NewEbayOrderTransactionEventRule:
           Type: EventBridgeRule
           Properties:
             Pattern:
               detail-type:
-                - transaction
+                - ebay-transaction
               detail:
-                MessageAttributes:
-                  eBayOrderId:
-                    - { "exists": true }
+                Message:
+                  reference:
+                    - { "prefix": "eBay O*" }
       EventInvokeConfig:
         DestinationConfig:
           OnSuccess:
             Type: EventBridge
             Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
 
-  StarlingEbayPayoutEnricher:
+  EbayPayoutEnricher:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ebay_payout_enricher/
+      CodeUri: ebay/payout_enricher/
       Events:
         NewEbayPayoutTransactionEventRule:
           Type: EventBridgeRule
           Properties:
             Pattern:
               detail-type:
-                - transaction
+                - ebay-transaction
               detail:
-                MessageAttributes:
-                  eBayPayoutId:
-                    - { "exists": true }
+                Message:
+                  reference:
+                    - { "prefix": "P*" }
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  EbayChargeEnricher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay/charge_enricher/
+      Events:
+        NewEbayPayoutTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-transaction
+              detail:
+                Message:
+                  reference:
+                    - { "prefix": "eBay C " }
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  EbayTransactionFetcher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay/transaction_fetcher/
+      Events:
+        ScheduledEvent:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 3 * * ? *)"
+            ScheduleExpressionTimezone: UTC
+            RetryPolicy:
+              MaximumRetryAttempts: 3
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  EbayShippingLabelToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay/shipping_label_to_transaction/
+      Events:
+        EbayTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - "SHIPPING_LABEL"
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  EbayNonSaleChargeToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay/non_sale_charge_to_transaction/
+      Events:
+        EbayTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - "NON_SALE_CHARGE"
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  EbaySaleToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay/sale_to_transaction/
+      Events:
+        EbayTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - "SALE"
       EventInvokeConfig:
         DestinationConfig:
           OnSuccess:

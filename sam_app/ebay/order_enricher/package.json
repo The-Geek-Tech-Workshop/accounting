@@ -1,0 +1,19 @@
+{
+  "name": "ebay_payout_enricher",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "author": "Andrew Todd",
+  "dependencies": {
+    "accounting_constants": "file:../../accounting_constants",
+    "aws-sdk": "^2.1659.0",
+    "gtw-ebay-client": "file:../gtw-ebay-client/gtw-ebay-client-1.0.0.tgz"
+  },
+  "scripts": {
+    "test": "mocha tests/unit/"
+  },
+  "devDependencies": {
+    "chai": "^4.3.6",
+    "mocha": "^10.2.0"
+  }
+}
