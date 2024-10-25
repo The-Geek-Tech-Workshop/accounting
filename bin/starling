@@ -1,0 +1,2 @@
+#!/bin/bash
+docker run thegeektechworkshop/starling-cli -it -v StarlingVolume:/root/.config/configstore
