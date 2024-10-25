@@ -26,7 +26,8 @@ export const lambdaHandler = async (event) => {
   const ebayOrderResponse = await ebayClient.trading.GetOrders({
     OrderIDArray: [{ OrderID: saleTransaction.orderId }],
   });
-  const item = orderTransaction.Item;
+  const order = ebayOrderResponse.OrderArray.Order[0];
+  const item = order.TransactionArray.Transaction[0];
 
   return {
     Messages: saleTransaction.orderLineItems.reduce((messages, lineItem) => {
