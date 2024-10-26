@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import constants from "accounting_constants";
+import { DateTime } from "luxon";
 
 const STARLING_BANK_ACCOUNT_NAME = "GTW";
 const STARLING_BUSINESS_BANK_ACCOUNT_NAME = "Starling (Business)";
@@ -19,6 +20,7 @@ const personalData = JSON.parse(
 );
 
 export const lambdaHandler = async (event) => {
+  console.log(JSON.stringify(event));
   const webhook = event.detail;
   const feedItem = webhook.content;
 
@@ -70,7 +72,7 @@ const extractTransaction = async (accountHolderUid, feedItem) => {
       Message: JSON.stringify({
         source: STARLING_SOURCE,
         sourceTransactionId: feedItem.feedItemUid,
-        transactionDate: toIsoDateString(feedItem.transactionTime),
+        transactionDate: DateTime.fromISO(feedItem.transactionTime).toISODate(),
         creditedAccount: creditedAccount,
         debitedAccount: debitedAccount,
         skuOrPurchaseId: skuOrPurchaseId,

@@ -1,11 +1,8 @@
 import constants from "accounting_constants";
 
-const ebayPayoutIdRegex = /^P\*(?<payoutId>.+)$/gm;
-
 export const lambdaHandler = async (event) => {
   const transaction = JSON.parse(event.detail.Message);
-  const ebayPayoutId = ebayPayoutIdRegex.exec(transaction.reference).groups
-    .payoutId;
+  const ebayPayoutId = event.detail.MessageAttributes.ebayId;
 
   return {
     Messages: [

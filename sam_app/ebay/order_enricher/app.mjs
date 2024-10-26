@@ -2,7 +2,6 @@ import ebayClientBuilder from "gtw-ebay-client";
 import constants from "accounting_constants";
 
 const VAT_TAX_PERCENTAGE = 20;
-const ebayOrderIdRegex = /^eBay O\*(?<orderId>.+)$/gm;
 
 const ebayClient = await ebayClientBuilder(
   `${import.meta.dirname}/ebay-auth.json`
@@ -10,8 +9,7 @@ const ebayClient = await ebayClientBuilder(
 
 export const lambdaHandler = async (event) => {
   const transaction = JSON.parse(event.detail.Message);
-  const ebayOrderId = ebayOrderIdRegex.exec(transaction.reference).groups
-    .orderId;
+  const ebayOrderId = event.detail.MessageAttributes.ebayId;
 
   const ebayOrderResponse = await ebayClient.trading.GetOrders({
     OrderIDArray: [{ OrderID: ebayOrderId }],

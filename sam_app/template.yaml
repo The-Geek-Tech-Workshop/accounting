@@ -19,6 +19,16 @@ Globals:
       - x86_64
 
 Resources:
+  AccountingAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+          Description: Usage plan for this API
+
   EventSplitter:
     Type: AWS::Serverless::Function
     Properties:
@@ -52,7 +62,30 @@ Resources:
         StarlingFeedItem:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountingAPI
             Path: /starling/business/feed-item
+            Method: post
+            Auth:
+              ApiKeyRequired: false
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  StarlingAddFeedItemEndpoint:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: starling/add_feed_item/
+      Events:
+        StarlingFeedItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AccountingAPI
+            Path: /starling/feed-item
             Method: post
     Connectors:
       OutgoingTopicConnector:
@@ -115,6 +148,23 @@ Resources:
               detail-type:
                 - triaged-transaction
 
+  EbayTriage:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay/ebay_triage/
+      Events:
+        NewEbayOrderTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-transaction
+      EventInvokeConfig:
+        DestinationConfig:
+          OnSuccess:
+            Type: EventBridge
+            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
   EbayOrderEnricher:
     Type: AWS::Serverless::Function
     Properties:
@@ -125,11 +175,7 @@ Resources:
           Properties:
             Pattern:
               detail-type:
-                - ebay-transaction
-              detail:
-                Message:
-                  reference:
-                    - { "prefix": "eBay O*" }
+                - ebay-transaction-order
       EventInvokeConfig:
         DestinationConfig:
           OnSuccess:
@@ -146,11 +192,7 @@ Resources:
           Properties:
             Pattern:
               detail-type:
-                - ebay-transaction
-              detail:
-                Message:
-                  reference:
-                    - { "prefix": "P*" }
+                - ebay-transaction-payout
       EventInvokeConfig:
         DestinationConfig:
           OnSuccess:
@@ -167,11 +209,7 @@ Resources:
           Properties:
             Pattern:
               detail-type:
-                - ebay-transaction
-              detail:
-                Message:
-                  reference:
-                    - { "prefix": "eBay C " }
+                - ebay-transaction-charge
       EventInvokeConfig:
         DestinationConfig:
           OnSuccess:

@@ -20,5 +20,7 @@ export const lambdaHandler = async (event) => {
   };
 };
 
-const isEbayTransaction = (event) =>
-  TRANSACTION_EBAY_NAMES.includes(event.detail.Message.who);
+const isEbayTransaction = (event) => {
+  const messageJson = JSON.parse(event.detail.Message);
+  return TRANSACTION_EBAY_NAMES.includes(messageJson.who);
+};

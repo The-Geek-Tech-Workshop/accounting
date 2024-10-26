@@ -1,0 +1,11 @@
+{
+  "name": "add_feed_item",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "author": "Andrew Todd",
+  "dependencies": {
+    "@aws-sdk/client-eventbridge": "^3.658.1",
+    "accounting_constants": "file:../../accounting_constants"
+  }
+}

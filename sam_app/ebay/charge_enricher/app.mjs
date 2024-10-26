@@ -1,11 +1,8 @@
 import constants from "accounting_constants";
 
-const ebayChargeIdRegex = /^eBay C (?<chargeId>.+)$/gm;
-
 export const lambdaHandler = async (event) => {
   const transaction = JSON.parse(event.detail.Message);
-  const ebayChargeId = ebayChargeIdRegex.exec(transaction.reference).groups
-    .chargeId;
+  const ebayChargeId = event.detail.MessageAttributes.ebayId;
 
   return {
     Messages: [

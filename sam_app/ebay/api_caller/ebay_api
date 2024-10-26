@@ -33,9 +33,9 @@ const handleTransactions = async ({
   prettyPrintJson(eBayResponse);
 };
 
-program
-  .version("1.0.0", "-v, --version")
-  .usage("OPTIONS...")
+const app = program.version("1.0.0", "-v, --version");
+
+app
   .command("transactions")
   .description("Retrieve transaction data")
   .option("-i --id <string>", "Return a transaction by transaction-id")
@@ -44,41 +44,42 @@ program
   .option("-y --type <string>", "Transactions type")
   .option("-o --offset <number>", "Results offset")
   .option("-l --limit <number>", "Results limit")
-  .action(handleTransactions)
-  // .option("-p, --payout <string>", "Interogate a payout")
-  // .option("-o --order <string>", "Interrogate an order Id")
-  // .option("-i --item <string>", "Interrogate an item Id")
-  // .option("-t --transaction <string>", "Interrogate an transaction Id")
-  .parseAsync(process.argv);
+  .action(handleTransactions);
+// .option("-p, --payout <string>", "Interogate a payout")
+// .option("-o --order <string>", "Interrogate an order Id")
+// .option("-i --item <string>", "Interrogate an item Id")
+// .option("-t --transaction <string>", "Interrogate an transaction Id")
 
-const options = program.opts();
+app.parseAsync(process.argv);
 
-if (options.payout) {
-  console.log(`Requesting transactions for payout ${options.payout}`);
-  const eBayTransactionsResponse =
-    await ebayClient.sell.finances.sign.getTransactions({
-      filter: `payoutId:{${options.payout}}`,
-    });
-  console.log(JSON.stringify(eBayTransactionsResponse, null, 4));
-} else if (options.order) {
-  const ebayOrderResponse = await ebayClient.trading.GetOrders({
-    OrderIDArray: [{ OrderID: options.order }],
-  });
-  console.log(JSON.stringify(ebayOrderResponse, null, 4));
-} else if (options.item) {
-  const ebayOrderResponse = await ebayClient.trading.GetItem({
-    ItemID: options.item,
-  });
-  console.log(JSON.stringify(ebayOrderResponse, null, 4));
-} else if (options.transaction) {
-  const eBayResponse = await ebayClient.sell.finances.sign.getTransactions({
-    // filter: [
-    //   `transactionId:{${options.transaction}}`,
-    //   "transactionType:{SHIPPING_LABEL}",
-    // ],
-    filter: "transactionType:{SHIPPING_LABEL}",
-  });
-  console.log(JSON.stringify(eBayResponse, null, 4));
-}
+// const options = program.opts();
+
+// if (options.payout) {
+//   console.log(`Requesting transactions for payout ${options.payout}`);
+//   const eBayTransactionsResponse =
+//     await ebayClient.sell.finances.sign.getTransactions({
+//       filter: `payoutId:{${options.payout}}`,
+//     });
+//   console.log(JSON.stringify(eBayTransactionsResponse, null, 4));
+// } else if (options.order) {
+//   const ebayOrderResponse = await ebayClient.trading.GetOrders({
+//     OrderIDArray: [{ OrderID: options.order }],
+//   });
+//   console.log(JSON.stringify(ebayOrderResponse, null, 4));
+// } else if (options.item) {
+//   const ebayOrderResponse = await ebayClient.trading.GetItem({
+//     ItemID: options.item,
+//   });
+//   console.log(JSON.stringify(ebayOrderResponse, null, 4));
+// } else if (options.transaction) {
+//   const eBayResponse = await ebayClient.sell.finances.sign.getTransactions({
+//     // filter: [
+//     //   `transactionId:{${options.transaction}}`,
+//     //   "transactionType:{SHIPPING_LABEL}",
+//     // ],
+//     filter: "transactionType:{SHIPPING_LABEL}",
+//   });
+//   console.log(JSON.stringify(eBayResponse, null, 4));
+// }
 
 const prettyPrintJson = (json) => console.log(JSON.stringify(json, null, 4));

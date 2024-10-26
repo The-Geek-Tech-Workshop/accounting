@@ -1,2 +1,2 @@
 #!/bin/bash
-docker run thegeektechworkshop/starling-cli -it -v StarlingVolume:/root/.config/configstore
+docker run  -it -v StarlingVolume:/root/.config/configstore thegeektechworkshop/starling-cli $@
