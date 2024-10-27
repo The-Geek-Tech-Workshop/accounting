@@ -5,8 +5,10 @@
   "main": "app.js",
   "author": "Andrew Todd",
   "dependencies": {
+    "@aws-sdk/client-eventbridge": "^3.679.0",
     "accounting_constants": "file:../../accounting_constants",
     "aws-sdk": "^2.1659.0",
+    "event_bridge_wrapper": "file:../../../libs/aws/event_bridge_wrapper",
     "gtw-ebay-client": "file:../gtw-ebay-client/gtw-ebay-client-1.0.0.tgz"
   },
   "scripts": {

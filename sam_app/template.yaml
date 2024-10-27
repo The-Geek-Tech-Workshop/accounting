@@ -29,28 +29,6 @@ Resources:
           CreateUsagePlan: PER_API
           Description: Usage plan for this API
 
-  EventSplitter:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: event_splitter/
-      Events:
-        AccountingEvents:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              source:
-                - "lambda"
-              detail-type:
-                - "Lambda Function Invocation Result - Success"
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
   StarlingBusinessFeedItemWebhook:
     Type: AWS::Serverless::Function
     Properties:
@@ -109,28 +87,14 @@ Resources:
                 - "custom.gtw.accountingApp"
               detail-type:
                 - "starling-verified-feeditem"
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-
-  TransactionTriage:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: transaction_triage/
-      Events:
-        EbayTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - transaction
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
 
   SheetsTransactionWriter:
     Type: AWS::Serverless::Function
@@ -145,25 +109,10 @@ Resources:
           Type: EventBridgeRule
           Properties:
             Pattern:
+              source:
+                - "custom.gtw.accountingApp"
               detail-type:
-                - triaged-transaction
-
-  EbayTriage:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/ebay_triage/
-      Events:
-        NewEbayOrderTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - ebay-transaction
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+                - transaction
 
   EbayOrderEnricher:
     Type: AWS::Serverless::Function
@@ -175,12 +124,19 @@ Resources:
           Properties:
             Pattern:
               detail-type:
-                - ebay-transaction-order
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+                - transaction
+              detail:
+                who:
+                  - eBay
+                description: [{ "prefix": "eBay O*" }]
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
 
   EbayPayoutEnricher:
     Type: AWS::Serverless::Function
@@ -192,12 +148,19 @@ Resources:
           Properties:
             Pattern:
               detail-type:
-                - ebay-transaction-payout
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+                - transaction
+              detail:
+                who:
+                  - EBAY_COMMERCE_UK_LTD
+                description: [{ "prefix": "P*" }]
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
 
   EbayChargeEnricher:
     Type: AWS::Serverless::Function
@@ -209,12 +172,19 @@ Resources:
           Properties:
             Pattern:
               detail-type:
-                - ebay-transaction-charge
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+                - transaction
+              detail:
+                who:
+                  - EBAY_COMMERCE_UK_LTD
+                description: [{ "prefix": "eBay C" }]
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
 
   EbayTransactionFetcher:
     Type: AWS::Serverless::Function
@@ -251,11 +221,14 @@ Resources:
               detail:
                 transactionType:
                   - "SHIPPING_LABEL"
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
 
   EbayNonSaleChargeToTransaction:
     Type: AWS::Serverless::Function
@@ -271,11 +244,14 @@ Resources:
               detail:
                 transactionType:
                   - "NON_SALE_CHARGE"
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
 
   EbaySaleToTransaction:
     Type: AWS::Serverless::Function
@@ -291,8 +267,11 @@ Resources:
               detail:
                 transactionType:
                   - "SALE"
-      EventInvokeConfig:
-        DestinationConfig:
-          OnSuccess:
-            Type: EventBridge
-            Destination: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write

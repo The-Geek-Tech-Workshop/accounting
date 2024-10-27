@@ -9,6 +9,7 @@ const SCOPES = [
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
 const TRANSACTION_ID_METADATA_KEY = "transactionId";
+const ENRICHED_TRANSACTION_ID_METADATA_KEY = "enrichedTransactionId";
 const NEW_ROW_NUMBER = 3;
 const a1RangeRowNumber = NEW_ROW_NUMBER;
 const a1Range = `Transactions!A${a1RangeRowNumber}:I${a1RangeRowNumber}`;
@@ -32,35 +33,41 @@ const existingRow = rowResult.data.values[0];
 const creditedAccountAssetLookupFunction = existingRow[2];
 const debitedAccountAssetLookupFunction = existingRow[4];
 
+const createNewRowRequest = {
+  insertDimension: {
+    range: {
+      sheetId: transactionsSheetId,
+      dimension: "ROWS",
+      startIndex: NEW_ROW_NUMBER - 1,
+      endIndex: NEW_ROW_NUMBER,
+    },
+    inheritFromBefore: true,
+  },
+};
+
 export const lambdaHandler = async (event) => {
-  console.log(JSON.stringify(event));
-  const transaction = JSON.parse(event.detail.Message);
+  const transaction = event.detail;
   const transactionId = `${transaction.source}-${transaction.sourceTransactionId}`;
   console.log(`Transaction: ${transactionId}`);
 
-  if (await doesTransactionAlreadyExist(transactionId)) {
-    console.log(`Transaction ${transactionId} already exists. Skipping...`);
+  const { hasBeenWritten, hasBeenWrittenEnriched, rowAlreadyWrittenTo } =
+    await getExistingRowMetadata(transactionId);
+
+  if (hasBeenWrittenEnriched || (hasBeenWritten && !transaction.isEnriched)) {
+    console.log(
+      `Transaction ${transactionId} (enriched: ${!!hasBeenWrittenEnriched}) already exists. Skipping...`
+    );
     return;
   }
 
-  const createNewRowRequest = {
-    insertDimension: {
-      range: {
-        sheetId: transactionsSheetId,
-        dimension: "ROWS",
-        startIndex: NEW_ROW_NUMBER - 1,
-        endIndex: NEW_ROW_NUMBER,
-      },
-      inheritFromBefore: true,
-    },
-  };
+  const rowToUpdate = rowAlreadyWrittenTo || NEW_ROW_NUMBER;
 
   const updateCellsRequest = {
     updateCells: {
       range: {
         sheetId: transactionsSheetId,
-        startRowIndex: NEW_ROW_NUMBER - 1,
-        endRowIndex: NEW_ROW_NUMBER,
+        startRowIndex: rowToUpdate - 1,
+        endRowIndex: rowToUpdate,
       },
       fields: "userEnteredValue",
       rows: [
@@ -107,17 +114,21 @@ export const lambdaHandler = async (event) => {
     },
   };
 
+  const metadataKeyToWrite = transaction.isEnriched
+    ? ENRICHED_TRANSACTION_ID_METADATA_KEY
+    : TRANSACTION_ID_METADATA_KEY;
+
   const createDeveloperMetadataRequest = {
     createDeveloperMetadata: {
       developerMetadata: {
-        metadataKey: TRANSACTION_ID_METADATA_KEY,
+        metadataKey: metadataKeyToWrite,
         metadataValue: transactionId,
         location: {
           dimensionRange: {
             sheetId: transactionsSheetId,
             dimension: "ROWS",
-            startIndex: NEW_ROW_NUMBER - 1,
-            endIndex: NEW_ROW_NUMBER,
+            startIndex: rowToUpdate - 1,
+            endIndex: rowToUpdate,
           },
         },
         visibility: "DOCUMENT",
@@ -143,7 +154,7 @@ export const lambdaHandler = async (event) => {
     spreadsheetId: SPREADSHEET_ID,
     resource: {
       requests: [
-        createNewRowRequest,
+        ...(rowAlreadyWrittenTo ? [] : [createNewRowRequest]),
         updateCellsRequest,
         createDeveloperMetadataRequest,
         sortRowsRequest,
@@ -152,7 +163,7 @@ export const lambdaHandler = async (event) => {
   });
 };
 
-const doesTransactionAlreadyExist = async (transactionId) => {
+const getExistingRowMetadata = async (transactionId) => {
   const existingTransactionResult =
     await sheetsApi.spreadsheets.developerMetadata.search({
       spreadsheetId: SPREADSHEET_ID,
@@ -164,11 +175,31 @@ const doesTransactionAlreadyExist = async (transactionId) => {
               metadataValue: transactionId,
             },
           },
+          {
+            developerMetadataLookup: {
+              metadataKey: ENRICHED_TRANSACTION_ID_METADATA_KEY,
+              metadataValue: transactionId,
+            },
+          },
         ],
       },
     });
 
-  return Object.keys(existingTransactionResult.data).length > 0;
+  const matches = existingTransactionResult.data.matchedDeveloperMetadata || [];
+
+  return {
+    hasBeenWritten: matches.length > 0,
+    hasBeenWrittenEnriched:
+      matches.filter(
+        (match) =>
+          match.developerMetadata.metadataKey ===
+          ENRICHED_TRANSACTION_ID_METADATA_KEY
+      ).length > 0,
+    rowAlreadyWrittenTo:
+      matches.length > 0
+        ? matches[0].developerMetadata.location.dimensionRange.startIndex + 1
+        : null,
+  };
 };
 
 const MILLISECONDS_IN_A_DAY = 1000 * 3600 * 24;

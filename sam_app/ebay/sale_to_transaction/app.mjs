@@ -1,6 +1,8 @@
 import ebayClientBuilder from "gtw-ebay-client";
 import { DateTime } from "luxon";
 import constants from "accounting_constants";
+import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
+import { sendMessages } from "event_bridge_wrapper";
 
 const EBAY_FEE_DATA = {
   REGULATORY_OPERATING_FEE: {
@@ -20,6 +22,8 @@ const EBAY_FEE_DATA = {
 const ebayClient = await ebayClientBuilder(
   `${import.meta.dirname}/ebay-auth.json`
 );
+const eventBridgeClient = new EventBridgeClient();
+
 export const lambdaHandler = async (event) => {
   const saleTransaction = event.detail;
 
@@ -29,8 +33,9 @@ export const lambdaHandler = async (event) => {
   const order = ebayOrderResponse.OrderArray.Order[0];
   const item = order.TransactionArray.Transaction[0];
 
-  return {
-    Messages: saleTransaction.orderLineItems.reduce((messages, lineItem) => {
+  await sendMessages(
+    eventBridgeClient,
+    saleTransaction.orderLineItems.reduce((messages, lineItem) => {
       const baseSourceTransactionId = `${ebayTransaction.transactionId}-${lineItem.lineItemId}`;
       const transactionDate = DateTime.fromISO(
         saleTransaction.transactionDate
@@ -38,47 +43,39 @@ export const lambdaHandler = async (event) => {
       return [
         ...messages,
         {
-          Detail: {
-            Message: JSON.stringify({
-              source: constants.ACCOUNTING.SOURCE.EBAY,
-              sourceTransactionId: `${baseSourceTransactionId}-sale`,
-              transactionDate: transactionDate,
-              creditedAccount: constants.ACCOUNT.SALES,
-              debitedAccount: constants.ACCOUNT.EBAY,
-              skuOrPurchaseId: item.SKU,
-              amount: lineItem.feeBasisAmount.value,
-              description: item.Title,
-              who: `${paymentsEntity}: ${saleTransaction.buyer.username}`,
-            }),
-            MessageAttributes: {
-              isEnriched: true,
-            },
-          },
+          Detail: JSON.stringify({
+            source: constants.ACCOUNTING.SOURCE.EBAY,
+            sourceTransactionId: `${baseSourceTransactionId}-sale`,
+            transactionDate: transactionDate,
+            creditedAccount: constants.ACCOUNT.SALES,
+            debitedAccount: constants.ACCOUNT.EBAY,
+            skuOrPurchaseId: item.SKU,
+            amount: lineItem.feeBasisAmount.value,
+            description: item.Title,
+            who: `${paymentsEntity}: ${saleTransaction.buyer.username}`,
+          }),
           DetailType: constants.MESSAGE.DETAIL_TYPE.TRANSACTION,
+          Source: constants.MESSAGE.SOURCE.GTW_ACCOUNTING,
         },
         ...lineItem.marketplaceFees.map((fee) => {
           const feeData = EBAY_FEE_DATA[fee.feeType];
           return {
-            Detail: {
-              Message: {
-                source: ACCOUNTING_SOURCE__EBAY,
-                sourceTransactionId: `${baseSourceTransactionId}-${feeData.code}`,
-                transactionDate: transactionDate,
-                creditedAccount: constants.ACCOUNT.EBAY,
-                debitedAccount: constants.ACCOUNT.TRANSACTION_FEES,
-                skuOrPurchaseId: item.SKU,
-                amount: fee.amount.value,
-                description: feeData.description,
-                who: saleTransaction.paymentsEntity,
-              },
-              MessageAttributes: {
-                isEnriched: true,
-              },
-            },
+            Detail: JSON.stringify({
+              source: ACCOUNTING_SOURCE__EBAY,
+              sourceTransactionId: `${baseSourceTransactionId}-${feeData.code}`,
+              transactionDate: transactionDate,
+              creditedAccount: constants.ACCOUNT.EBAY,
+              debitedAccount: constants.ACCOUNT.TRANSACTION_FEES,
+              skuOrPurchaseId: item.SKU,
+              amount: fee.amount.value,
+              description: feeData.description,
+              who: saleTransaction.paymentsEntity,
+            }),
             DetailType: constants.MESSAGE.DETAIL_TYPE.TRANSACTION,
+            Source: constants.MESSAGE.SOURCE.GTW_ACCOUNTING,
           };
         }),
       ];
-    }),
-  };
+    })
+  );
 };

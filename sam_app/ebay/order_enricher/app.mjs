@@ -1,15 +1,20 @@
 import ebayClientBuilder from "gtw-ebay-client";
 import constants from "accounting_constants";
+import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
+import { sendMessages } from "event_bridge_wrapper";
 
 const VAT_TAX_PERCENTAGE = 20;
 
 const ebayClient = await ebayClientBuilder(
   `${import.meta.dirname}/ebay-auth.json`
 );
+const eventBridgeClient = new EventBridgeClient();
+
+const idRegex = /^eBay O\*(?<id>.+)$/m;
 
 export const lambdaHandler = async (event) => {
-  const transaction = JSON.parse(event.detail.Message);
-  const ebayOrderId = event.detail.MessageAttributes.ebayId;
+  const transaction = event.detail;
+  const ebayOrderId = idRegex.exec(transaction.description).groups.id;
 
   const ebayOrderResponse = await ebayClient.trading.GetOrders({
     OrderIDArray: [{ OrderID: ebayOrderId }],
@@ -27,44 +32,38 @@ export const lambdaHandler = async (event) => {
     order.ShippingServiceSelected.ShippingServiceCost.value > 0
       ? [
           {
-            Detail: {
-              Message: JSON.stringify({
-                ...transaction,
-                sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
-                debitedAccount: constants.ACCOUNT.INWARD_SHIPPING,
-                amount: getCost(
-                  order.ShippingServiceSelected.ShippingServiceCost.value
-                ),
-                description: order.ShippingServiceSelected.ShippingService,
-                who: who,
-              }),
-              MessageAttributes: {
-                isEnriched: true,
-              },
-            },
+            Detail: JSON.stringify({
+              ...transaction,
+              isEnriched: true,
+              sourceTransactionId: `${transaction.sourceTransactionId}-shipping`,
+              debitedAccount: constants.ACCOUNT.INWARD_SHIPPING,
+              amount: getCost(
+                order.ShippingServiceSelected.ShippingServiceCost.value
+              ),
+              description: order.ShippingServiceSelected.ShippingService,
+              who: who,
+            }),
             DetailType: constants.MESSAGE.DETAIL_TYPE.TRANSACTION,
+            Source: constants.MESSAGE.SOURCE.GTW_ACCOUNTING,
           },
         ]
       : [];
   const messages = [
     {
-      Detail: {
-        Message: JSON.stringify({
-          ...transaction,
-          amount: getCost(item.TransactionPrice.value),
-          description: item.Item.Title,
-          who: who,
-        }),
-        MessageAttributes: {
-          isEnriched: true,
-        },
-      },
+      Detail: JSON.stringify({
+        ...transaction,
+        isEnriched: true,
+        amount: getCost(item.TransactionPrice.value),
+        description: item.Item.Title,
+        who: who,
+      }),
       DetailType: constants.MESSAGE.DETAIL_TYPE.TRANSACTION,
+      Source: constants.MESSAGE.SOURCE.GTW_ACCOUNTING,
     },
     ...additionalMessages,
   ];
 
-  return { Messages: messages };
+  await sendMessages(eventBridgeClient, messages);
 };
 
 const addVAT = (costWithoutVAT) =>

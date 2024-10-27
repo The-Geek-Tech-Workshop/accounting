@@ -2,6 +2,7 @@ export default Object.freeze({
   ACCOUNTING: {
     SOURCE: {
       EBAY: "EBAY",
+      STARLING: "STARLING",
     },
     FROM: {
       EBAY: "eBay",
@@ -14,6 +15,9 @@ export default Object.freeze({
     LISTING_FEES: "Listing Fees",
     TRANSACTION_FEES: "Transaction Fees",
     SALES: "Sales",
+    STARLING_BUSINESS: "Starling (Business)",
+    CAPITAL: "Capital",
+    DRAWINGS: "Drawings",
   },
   MESSAGE: {
     SOURCE: {

@@ -1,0 +1,12 @@
+{
+  "name": "event_bridge_wrapper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "author": "Andrew Todd",
+  "license": "ISC",
+  "description": "",
+  "peerDependencies": {
+    "@aws-sdk/client-eventbridge": ">= 3.658.1"
+  }
+}
