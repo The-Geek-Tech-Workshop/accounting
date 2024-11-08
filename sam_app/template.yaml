@@ -3,9 +3,9 @@ Transform: AWS::Serverless-2016-10-31
 Description: |
   sam_app
 Parameters:
-  SpreadsheetId:
+  StarlingPublicKey:
     Type: String
-  StarlingBusinessPublicKey:
+  SpreadsheetId:
     Type: String
   GoogleCredentialsFile:
     Type: String
@@ -19,274 +19,23 @@ Globals:
       - x86_64
 
 Resources:
-  AccountingAPI:
-    Type: AWS::Serverless::Api
-    Properties:
-      StageName: Prod
-      Auth:
-        ApiKeyRequired: true
-        UsagePlan:
-          CreateUsagePlan: PER_API
-          Description: Usage plan for this API
 
   EbayModule:
     Type: AWS::Serverless::Application
     Properties:
       Location: ebay/template.yaml
+
+  StarlingModule:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: starling/template.yaml
       Parameters:
-        RestApiId: !Ref AccountingAPI
+        StarlingPublicKey: !Ref StarlingPublicKey
 
-  StarlingBusinessFeedItemWebhook:
-    Type: AWS::Serverless::Function
+  SheetsModule:
+    Type: AWS::Serverless::Application
     Properties:
-      CodeUri: starling/feed_item_webhook/
-      Environment:
-        Variables:
-          PUBLIC_KEY: !Ref StarlingBusinessPublicKey
-      Events:
-        StarlingFeedItem:
-          Type: Api
-          Properties:
-            RestApiId: !Ref AccountingAPI
-            Path: /starling/business/feed-item
-            Method: post
-            Auth:
-              ApiKeyRequired: false
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  StarlingAddFeedItemEndpoint:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: starling/add_feed_item/
-      Events:
-        StarlingFeedItem:
-          Type: Api
-          Properties:
-            RestApiId: !Ref AccountingAPI
-            Path: /starling/feed-item
-            Method: post
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  StarlingFeedItemToTransaction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: starling/feed_item_to_transaction/
-      Events:
-        VerifiedStarlingFeedItemEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              source:
-                - custom.gtw.accountingApp
-              detail-type:
-                - starling-verified-feeditem
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  SheetsTransactionWriter:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: sheets/transaction_writer/
-      Environment:
-        Variables:
-          SPREADSHEET_ID: !Ref SpreadsheetId
-          GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
-      Events:
-        NewTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              source:
-                - custom.gtw.accountingApp
-              detail-type:
-                - transaction
-
-
-  EbayPayoutEnricher:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/payout_enricher/
-      Events:
-        NewEbayPayoutTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - transaction
-              detail:
-                who:
-                  - EBAY Commerce UK Ltd
-                description:
-                  - prefix: P*
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  EbayChargeEnricher:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/charge_enricher/
-      Events:
-        NewEbayPayoutTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - transaction
-              detail:
-                who:
-                  - EBAY_COMMERCE_UK_LTD
-                description:
-                  - prefix: eBay C
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  EbayTransactionFetcher:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/transaction_fetcher/
-      Events:
-        ScheduledEvent:
-          Type: ScheduleV2
-          Properties:
-            ScheduleExpression: cron(0 3 * * ? *)
-            ScheduleExpressionTimezone: UTC
-            RetryPolicy:
-              MaximumRetryAttempts: 3
-        EbayTransactionFetchRequest:
-          Type: Api
-          Properties:
-            RestApiId: !Ref AccountingAPI
-            Path: /ebay/transactions/fetch
-            Method: post
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  EbayShippingLabelToTransaction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/shipping_label_to_transaction/
-      Events:
-        EbayTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - ebay-feeditem
-              detail:
-                transactionType:
-                  - SHIPPING_LABEL
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  EbayNonSaleChargeToTransaction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/non_sale_charge_to_transaction/
-      Events:
-        EbayTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - ebay-feeditem
-              detail:
-                transactionType:
-                  - NON_SALE_CHARGE
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  EbaySaleToTransaction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/sale_to_transaction/
-      Events:
-        EbayTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - ebay-feeditem
-              detail:
-                transactionType:
-                  - SALE
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
-
-  EbayRefundToTransaction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/refund_to_transaction/
-      Events:
-        EbayTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - ebay-feeditem
-              detail:
-                transactionType:
-                  - REFUND
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
+      Location: sheets/template.yaml
+      Parameters:
+        SpreadsheetId: !Ref SpreadsheetId
+        GoogleCredentialsFile: !Ref GoogleCredentialsFile

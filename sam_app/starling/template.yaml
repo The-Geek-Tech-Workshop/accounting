@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: |
+  Accounting - Starling module
+
+Parameters:
+  StarlingPublicKey:
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 10
+    Handler: app.lambdaHandler
+    Runtime: nodejs20.x
+    Architectures:
+      - x86_64
+
+Resources:
+  RestAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+          Description: Usage plan for this API
+
+  FeedItemWebhook:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: feed_item_webhook/
+      Environment:
+        Variables:
+          PUBLIC_KEY: !Ref StarlingPublicKey
+      Events:
+        StarlingFeedItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestAPI
+            Path: /starling/business/feed-item
+            Method: post
+            Auth:
+              ApiKeyRequired: false
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  AddFeedItemEndpoint:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: add_feed_item/
+      Events:
+        StarlingFeedItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestAPI
+            Path: /starling/feed-item
+            Method: post
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  FeedItemToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: feed_item_to_transaction/
+      Events:
+        VerifiedStarlingFeedItemEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - custom.gtw.accountingApp
+              detail-type:
+                - starling-verified-feeditem
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write

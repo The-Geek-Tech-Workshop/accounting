@@ -2,9 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: |
   Accounting - Ebay module
-Parameters:
-  RestApiId:
-    Type: String
 
 Globals:
   Function:
@@ -15,6 +12,15 @@ Globals:
       - x86_64
 
 Resources:
+  RestAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        ApiKeyRequired: true
+        UsagePlan:
+          CreateUsagePlan: PER_API
+          Description: Usage plan for this API
   OrderEnricher:
     Type: AWS::Serverless::Function
     Properties:
@@ -31,6 +37,175 @@ Resources:
                   - eBay
                 description:
                   - prefix: eBay O*
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  PayoutEnricher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: payout_enricher/
+      Events:
+        PayoutTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - transaction
+              detail:
+                who:
+                  - EBAY Commerce UK Ltd
+                description:
+                  - prefix: P*
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  ChargeEnricher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: charge_enricher/
+      Events:
+        PayoutTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - transaction
+              detail:
+                who:
+                  - EBAY_COMMERCE_UK_LTD
+                description:
+                  - prefix: eBay C
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  TransactionFetcher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: transaction_fetcher/
+      Events:
+        ScheduledEvent:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 3 * * ? *)
+            ScheduleExpressionTimezone: UTC
+            RetryPolicy:
+              MaximumRetryAttempts: 3
+        TransactionFetchRequest:
+          Type: Api
+          Properties:
+            RestApiId: !Ref RestAPI
+            Path: /ebay/transactions/fetch
+            Method: post
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+            
+  ShippingLabelToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: shipping_label_to_transaction/
+      Events:
+        TransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - SHIPPING_LABEL
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  NonSaleChargeToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: non_sale_charge_to_transaction/
+      Events:
+        TransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - NON_SALE_CHARGE
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  SaleToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: sale_to_transaction/
+      Events:
+        TransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - SALE
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  RefundToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: refund_to_transaction/
+      Events:
+        TransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - REFUND
     Connectors:
       OutgoingTopicConnector:
         Properties:
