@@ -15,7 +15,7 @@ build_in_source = true
 lint = true
 
 [default.deploy.parameters]
-capabilities = "CAPABILITY_IAM"
+capabilities = "CAPABILITY_IAM CAPABILITY_AUTO_EXPAND"
 resolve_s3 = true
 s3_prefix = "accounting"
 region = "eu-west-2"

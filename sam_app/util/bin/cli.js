@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { program } from "commander";
-import { addStarlingTransaction } from "./main.js";
+import { addStarlingTransaction } from "../lib/commands/addStarlingTransaction.js";
+import { fetchEbayTransactions } from "../lib/commands/fetchEbayTransactions.js";
 
 const app = program.version("1.0.0", "-v --version");
 
 const add = app.command("add").alias("a");
-add
+const addStarling = add.command("starling");
+addStarling
   .command("feed-item")
   .alias("fi")
   .description("Add a feed-item from Starling")
@@ -15,4 +17,16 @@ add
   .action(async (accountUid, categoryUid, feedItemUid) =>
     addStarlingTransaction({ accountUid, categoryUid, feedItemUid })
   );
+
+const fetch = app.command("fetch").alias("f");
+const fetchEbay = fetch.command("ebay");
+fetchEbay
+  .command("transactions")
+  .alias("tx")
+  .description("Trigger fetching transactions for a single day from eBay")
+  .argument("<date>", "Date to fetch transactions for")
+  .action(async (date) => {
+    fetchEbayTransactions(date);
+  });
+
 app.parseAsync(process.argv);

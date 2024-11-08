@@ -1,6 +1,6 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
+Description: |
   sam_app
 Parameters:
   SpreadsheetId:
@@ -28,6 +28,13 @@ Resources:
         UsagePlan:
           CreateUsagePlan: PER_API
           Description: Usage plan for this API
+
+  EbayModule:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: ebay/template.yaml
+      Parameters:
+        RestApiId: !Ref AccountingAPI
 
   StarlingBusinessFeedItemWebhook:
     Type: AWS::Serverless::Function
@@ -84,9 +91,9 @@ Resources:
           Properties:
             Pattern:
               source:
-                - "custom.gtw.accountingApp"
+                - custom.gtw.accountingApp
               detail-type:
-                - "starling-verified-feeditem"
+                - starling-verified-feeditem
     Connectors:
       OutgoingTopicConnector:
         Properties:
@@ -110,33 +117,10 @@ Resources:
           Properties:
             Pattern:
               source:
-                - "custom.gtw.accountingApp"
+                - custom.gtw.accountingApp
               detail-type:
                 - transaction
 
-  EbayOrderEnricher:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ebay/order_enricher/
-      Events:
-        NewEbayOrderTransactionEventRule:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              detail-type:
-                - transaction
-              detail:
-                who:
-                  - eBay
-                description: [{ "prefix": "eBay O*" }]
-    Connectors:
-      OutgoingTopicConnector:
-        Properties:
-          Destination:
-            Type: AWS::Events::EventBus
-            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
-          Permissions:
-            - Write
 
   EbayPayoutEnricher:
     Type: AWS::Serverless::Function
@@ -151,8 +135,9 @@ Resources:
                 - transaction
               detail:
                 who:
-                  - EBAY_COMMERCE_UK_LTD
-                description: [{ "prefix": "P*" }]
+                  - EBAY Commerce UK Ltd
+                description:
+                  - prefix: P*
     Connectors:
       OutgoingTopicConnector:
         Properties:
@@ -176,7 +161,8 @@ Resources:
               detail:
                 who:
                   - EBAY_COMMERCE_UK_LTD
-                description: [{ "prefix": "eBay C" }]
+                description:
+                  - prefix: eBay C
     Connectors:
       OutgoingTopicConnector:
         Properties:
@@ -194,10 +180,16 @@ Resources:
         ScheduledEvent:
           Type: ScheduleV2
           Properties:
-            ScheduleExpression: "cron(0 3 * * ? *)"
+            ScheduleExpression: cron(0 3 * * ? *)
             ScheduleExpressionTimezone: UTC
             RetryPolicy:
               MaximumRetryAttempts: 3
+        EbayTransactionFetchRequest:
+          Type: Api
+          Properties:
+            RestApiId: !Ref AccountingAPI
+            Path: /ebay/transactions/fetch
+            Method: post
     Connectors:
       OutgoingTopicConnector:
         Properties:
@@ -220,7 +212,7 @@ Resources:
                 - ebay-feeditem
               detail:
                 transactionType:
-                  - "SHIPPING_LABEL"
+                  - SHIPPING_LABEL
     Connectors:
       OutgoingTopicConnector:
         Properties:
@@ -243,7 +235,7 @@ Resources:
                 - ebay-feeditem
               detail:
                 transactionType:
-                  - "NON_SALE_CHARGE"
+                  - NON_SALE_CHARGE
     Connectors:
       OutgoingTopicConnector:
         Properties:
@@ -266,7 +258,30 @@ Resources:
                 - ebay-feeditem
               detail:
                 transactionType:
-                  - "SALE"
+                  - SALE
+    Connectors:
+      OutgoingTopicConnector:
+        Properties:
+          Destination:
+            Type: AWS::Events::EventBus
+            Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+          Permissions:
+            - Write
+
+  EbayRefundToTransaction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ebay/refund_to_transaction/
+      Events:
+        EbayTransactionEventRule:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              detail-type:
+                - ebay-feeditem
+              detail:
+                transactionType:
+                  - REFUND
     Connectors:
       OutgoingTopicConnector:
         Properties:

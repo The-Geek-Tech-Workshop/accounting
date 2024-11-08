@@ -14,10 +14,10 @@ const ebayClient = await ebayClientBuilder(
 const eventBridgeClient = new EventBridgeClient();
 
 export const lambdaHandler = async (event) => {
-  const eventDate = DateTime.fromISO(event.time);
-
-  // When triggered, we process the transactions of the previous day
-  const dateToProcessTransactionsFor = eventDate.minus({ days: 1 });
+  // When triggered from Scheduled Cron, we process the transactions of the previous day
+  const dateToProcessTransactionsFor = event.time
+    ? DateTime.fromISO(event.time).minus({ days: 1 })
+    : DateTime.fromISO(JSON.parse(event.body).time);
 
   var thereAreMoreTransactionsToFetch = true;
   var offset = 0;
@@ -58,6 +58,11 @@ export const lambdaHandler = async (event) => {
   } while (thereAreMoreTransactionsToFetch);
 
   console.log(
-    `Transaction count for ${dateToProcessTransactionsFor.toISODate}: ${totalTransactions}`
+    `Transaction count for ${dateToProcessTransactionsFor.toISODate()}: ${totalTransactions}`
   );
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ transactionsFetched: totalTransactions }),
+  };
 };

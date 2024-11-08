@@ -1,13 +1,6 @@
 import fetch from "node-fetch";
 import { randomUUID } from "crypto";
-
-const TARGET_API_URL =
-  "https://hn93t12th7.execute-api.eu-west-2.amazonaws.com/Prod";
-
-const STARLING_BASE_URL = "https://api.starlingbank.com/api/v2";
-
-const STARLING_TOKEN = process.env.STARLING_PERSONAL_TOKEN;
-const ACCOUNTING_API_KEY = process.env.ACCOUNTING_API_KEY;
+import config from "../config.js";
 
 export const addStarlingTransaction = async ({
   accountUid,
@@ -17,11 +10,11 @@ export const addStarlingTransaction = async ({
   try {
     // Fetch account holder details
     const accountHolderResponse = await fetch(
-      `${STARLING_BASE_URL}/account-holder`,
+      `${config.starling.url}/account-holder`,
       {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${STARLING_TOKEN}`,
+          Authorization: `Bearer ${config.starling.accessToken}`,
           Accept: "application/json",
         },
       }
@@ -36,13 +29,13 @@ export const addStarlingTransaction = async ({
     const accountHolderData = await accountHolderResponse.json();
 
     // Construct the URL for a specific feed item
-    const starlingApiUrl = `${STARLING_BASE_URL}/feed/account/${accountUid}/category/${categoryUid}/${feedItemUid}`;
+    const starlingApiUrl = `${config.starling.url}/feed/account/${accountUid}/category/${categoryUid}/${feedItemUid}`;
 
     // Fetch specific transaction from Starling API
     const starlingResponse = await fetch(starlingApiUrl, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${STARLING_TOKEN}`,
+        Authorization: `Bearer ${config.starling.accessToken}`,
         Accept: "application/json",
       },
     });
@@ -65,15 +58,18 @@ export const addStarlingTransaction = async ({
     };
 
     // Submit the transaction data to target endpoint
-    const targetResponse = await fetch(`${TARGET_API_URL}/starling/feed-item`, {
-      method: "POST",
-      headers: {
-        "X-API-Key": ACCOUNTING_API_KEY,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(transactionWithWebhookWrapper),
-    });
+    const targetResponse = await fetch(
+      `${config.accounting.url}/starling/feed-item`,
+      {
+        method: "POST",
+        headers: {
+          "X-API-Key": config.accounting.apiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(transactionWithWebhookWrapper),
+      }
+    );
 
     if (!targetResponse.ok) {
       throw new Error(

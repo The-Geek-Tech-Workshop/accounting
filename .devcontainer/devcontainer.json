@@ -33,12 +33,18 @@
         "dbaeumer.vscode-eslint",
         "redhat.vscode-yaml",
         "esbenp.prettier-vscode"
-      ]
+      ],
+      "settings": {
+        "[javascript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode",
+          "editor.formatOnSave": true
+        }
+      }
     }
   },
 
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
   // "remoteUser": "root"
 
-  "postCreateCommand": "pip install cfn-lint && bash .devcontainer/create_auth_files.sh && bash .devcontainer/pull_docker_images.sh && bash .devcontainer/npm_install.sh"
+  "postCreateCommand": "pip install cfn-lint && bash .devcontainer/create_auth_files.sh && bash .devcontainer/pull_docker_images.sh"
 }

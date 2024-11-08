@@ -15,6 +15,7 @@ export default Object.freeze({
     LISTING_FEES: "Listing Fees",
     TRANSACTION_FEES: "Transaction Fees",
     SALES: "Sales",
+    SALE_RETURNS: "Sale Returns",
     STARLING_BUSINESS: "Starling (Business)",
     CAPITAL: "Capital",
     DRAWINGS: "Drawings",

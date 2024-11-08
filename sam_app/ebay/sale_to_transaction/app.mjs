@@ -30,13 +30,13 @@ export const lambdaHandler = async (event) => {
   const ebayOrderResponse = await ebayClient.trading.GetOrders({
     OrderIDArray: [{ OrderID: saleTransaction.orderId }],
   });
-  const order = ebayOrderResponse.OrderArray.Order[0];
-  const item = order.TransactionArray.Transaction[0];
 
-  await sendMessages(
-    eventBridgeClient,
-    saleTransaction.orderLineItems.reduce((messages, lineItem) => {
-      const baseSourceTransactionId = `${ebayTransaction.transactionId}-${lineItem.lineItemId}`;
+  const order = ebayOrderResponse.OrderArray.Order[0];
+  const item = order.TransactionArray.Transaction[0].Item;
+
+  const messages = saleTransaction.orderLineItems.reduce(
+    (messages, lineItem) => {
+      const baseSourceTransactionId = `${saleTransaction.transactionId}-${lineItem.lineItemId}`;
       const transactionDate = DateTime.fromISO(
         saleTransaction.transactionDate
       ).toISODate();
@@ -52,7 +52,7 @@ export const lambdaHandler = async (event) => {
             skuOrPurchaseId: item.SKU,
             amount: lineItem.feeBasisAmount.value,
             description: item.Title,
-            who: `${paymentsEntity}: ${saleTransaction.buyer.username}`,
+            who: `${saleTransaction.paymentsEntity}: ${saleTransaction.buyer.username}`,
           }),
           DetailType: constants.MESSAGE.DETAIL_TYPE.TRANSACTION,
           Source: constants.MESSAGE.SOURCE.GTW_ACCOUNTING,
@@ -61,7 +61,7 @@ export const lambdaHandler = async (event) => {
           const feeData = EBAY_FEE_DATA[fee.feeType];
           return {
             Detail: JSON.stringify({
-              source: ACCOUNTING_SOURCE__EBAY,
+              source: constants.ACCOUNTING.SOURCE.EBAY,
               sourceTransactionId: `${baseSourceTransactionId}-${feeData.code}`,
               transactionDate: transactionDate,
               creditedAccount: constants.ACCOUNT.EBAY,
@@ -76,6 +76,8 @@ export const lambdaHandler = async (event) => {
           };
         }),
       ];
-    })
+    },
+    []
   );
+  await sendMessages(eventBridgeClient, messages);
 };
