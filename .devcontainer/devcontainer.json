@@ -2,37 +2,26 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/debian
 {
   "name": "Debian",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+  "dockerFile": "Dockerfile",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {},
-    "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/goldsam/dev-container-features/aws-sam-cli:1": {},
-    "ghcr.io/devcontainers/features/python:1": {}
   },
 
   "containerEnv": {
-    "AWS_DEFAULT_REGION": "eu-west-2"
+    "AWS_DEFAULT_REGION": "eu-west-2",
+    "GOOGLE_PROJECT_ID": "grand-incentive-428409-j0"
   },
   "remoteEnv": {
     "PATH": "${containerEnv:PATH}:/workspaces/accounting/bin"
   },
 
-  // Features to add to the dev container. More info: https://containers.dev/features.
-  // "features": {},
-
-  // Use 'forwardPorts' to make a list of ports inside the container available locally.
-  // "forwardPorts": [],
-
-  // Configure tool-specific properties.
   "customizations": {
     "vscode": {
-      // Add the IDs of extensions you want installed when the container is created.
       "extensions": [
         "dbaeumer.vscode-eslint",
         "redhat.vscode-yaml",
-        "esbenp.prettier-vscode"
+        "esbenp.prettier-vscode",
+        "HashiCorp.terraform"
       ],
       "settings": {
         "[javascript]": {
@@ -43,8 +32,5 @@
     }
   },
 
-  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-  // "remoteUser": "root"
-
-  "postCreateCommand": "pip install cfn-lint && bash .devcontainer/create_auth_files.sh && bash .devcontainer/pull_docker_images.sh"
+  "postCreateCommand": "bash .devcontainer/create_auth_files.sh && bash .devcontainer/pull_docker_images.sh"
 }

@@ -6,7 +6,9 @@ Description: |
 Parameters:
   SpreadsheetId:
     Type: String
-  GoogleCredentialsFile:
+  GCPProjectNumber:
+    Type: String
+  GCPProjectId:
     Type: String
 
 Globals:
@@ -25,7 +27,14 @@ Resources:
       Environment:
         Variables:
           SPREADSHEET_ID: !Ref SpreadsheetId
-          GOOGLE_APPLICATION_CREDENTIALS: !Ref GoogleCredentialsFile
+          GOOGLE_AUDIENCE: !Sub "//iam.googleapis.com/projects/${GCPProjectNumber}/locations/global/workloadIdentityPools/aws-pool/providers/aws-provider"
+          GOOGLE_SERVICE_ACCOUNT: !Sub "sheets-writer@${GCPProjectId}.iam.gserviceaccount.com"
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: 
+                - "sts:AssumeRoleWithWebIdentity"
+              Resource: "*"
       Events:
         TransactionEventRule:
           Type: EventBridgeRule
