@@ -2,8 +2,23 @@
 import { program } from "commander";
 import { addStarlingTransaction } from "../lib/commands/addStarlingTransaction.js";
 import { fetchEbayTransactions } from "../lib/commands/fetchEbayTransactions.js";
+import { authenticateStarling } from "../lib/commands/authenticateStarling.js";
+import { authenticateAccounting } from "../lib/commands/authenticateAccounting.js";
 
 const app = program.version("1.0.0", "-v --version");
+
+const auth = app.command("auth").alias("au");
+auth
+  .command("starling")
+  .description("Store Starling Bank authentication token")
+  .argument("<token>", "Personal access token for Starling Bank")
+  .action(authenticateStarling);
+
+auth
+  .command("accounting")
+  .description("Store Accounting API key")
+  .argument("<key>", "API key for the accounting service")
+  .action(authenticateAccounting);
 
 const add = app.command("add").alias("a");
 const addStarling = add.command("starling");

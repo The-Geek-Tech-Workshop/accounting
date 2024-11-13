@@ -8,13 +8,16 @@ export const addStarlingTransaction = async ({
   feedItemUid,
 }) => {
   try {
+    // Config validation will throw if token is missing
+    const { starling, accounting } = config;
+
     // Fetch account holder details
     const accountHolderResponse = await fetch(
-      `${config.starling.url}/account-holder`,
+      `${starling.url}/account-holder`,
       {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${config.starling.accessToken}`,
+          Authorization: `Bearer ${starling.accessToken}`,
           Accept: "application/json",
         },
       }
@@ -29,13 +32,13 @@ export const addStarlingTransaction = async ({
     const accountHolderData = await accountHolderResponse.json();
 
     // Construct the URL for a specific feed item
-    const starlingApiUrl = `${config.starling.url}/feed/account/${accountUid}/category/${categoryUid}/${feedItemUid}`;
+    const starlingApiUrl = `${starling.url}/feed/account/${accountUid}/category/${categoryUid}/${feedItemUid}`;
 
     // Fetch specific transaction from Starling API
     const starlingResponse = await fetch(starlingApiUrl, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${config.starling.accessToken}`,
+        Authorization: `Bearer ${starling.accessToken}`,
         Accept: "application/json",
       },
     });
@@ -58,18 +61,15 @@ export const addStarlingTransaction = async ({
     };
 
     // Submit the transaction data to target endpoint
-    const targetResponse = await fetch(
-      `${config.accounting.url}/starling/feed-item`,
-      {
-        method: "POST",
-        headers: {
-          "X-API-Key": config.accounting.apiKey,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(transactionWithWebhookWrapper),
-      }
-    );
+    const targetResponse = await fetch(`${accounting.url}/starling/feed-item`, {
+      method: "POST",
+      headers: {
+        "X-API-Key": accounting.apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(transactionWithWebhookWrapper),
+    });
 
     if (!targetResponse.ok) {
       throw new Error(
@@ -83,11 +83,14 @@ export const addStarlingTransaction = async ({
       sourceData: transactionData,
     };
   } catch (error) {
-    console.error("Error processing transaction:", error);
-    return {
-      success: false,
-      transactionId: feedItemUid,
-      error: error.message,
-    };
+    if (error.message.includes("Missing required credential")) {
+      console.error("\x1b[31m%s\x1b[0m", error.message);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+    // Re-throw other errors to be handled by existing error handling
+    throw error;
   }
 };
