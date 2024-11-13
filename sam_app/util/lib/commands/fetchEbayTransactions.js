@@ -13,7 +13,7 @@ export const fetchEbayTransactions = async (date) => {
     const accountingResponse = await fetch(url, {
       method: "POST",
       headers: {
-        "X-API-Key": config.accounting.apiKey,
+        "X-API-Key": config.accounting.apiKey(),
         "Content-Type": "application/json",
         Accept: "application/json",
       },

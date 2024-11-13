@@ -20,11 +20,8 @@ resolve_s3 = true
 s3_prefix = "accounting"
 region = "eu-west-2"
 parameter_overrides = [
-    "GoogleCredentialsFile=./google_credentials.json",
     "SpreadsheetId=\"1x_P7IH0Tp_7IvpAM5pDk_X3sRsZy7BBUljK40Q0JAZs\"",
     "StarlingPublicKey=\"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp4p6DWMKTOihxDR2Rpg7fD5FSlcc2alM5is5WN+62eaT0LPvqLs20COQrh6VFBa6UgWmFo9you0LlKnrDMzTJPxXDljLaYUtHWyb0xbXqPf6pNXTKxQJmZZrFGQ6HveVsN+Qz6P4q0tuXgjhkRCw0mKVJ0Wrko8tR3K/ps4Rwxyme2F7fGsk1WwE31I95xn3/YChQZ1Q4bWC4fsFwcYWX6AspUYU6bbJVE5u7JuNBh1LQorqKNmnuCfq5hunocXAedH/k+FYk8GIfcVPIz9iKJNqzxl4zjXkgOJcPkb1lnInvI4VshciSH3NhSXlcCQl2L4ICwkxvH7sZP0cNv/UeQIDAQAB\"",
-    "GCPProjectNumber=\"607309422382\"",
-    "GCPProjectId=\"grand-incentive-428409\""
     ]
 image_repositories = []
 
@@ -42,7 +39,6 @@ warm_containers = "EAGER"
 
 [default.local_invoke.parameters]
 parameter_overrides = [
-    "GoogleCredentialsFile=./google_credentials.json",
     "SpreadsheetId=1ma6kpdHG1FM0HACbBVA8S1b71jAOGMO0s1SpTDfJiF4",
     "StarlingPublicKey=\"MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgH5uRK0zEWL5r1Njq7KaTMbzOAO9\n+vdWI1dt0Y2vN/ExslAcxETsZSwE2k5iGgsnBqfk6Ht54pZBoJ2s7NsAUbNdWu6V\nSYwBYBCr/9k2xY9cmOREIlyTjEL9OFjDc5N16v3Mwr+OdXfjqI+yNERYa0OcquVU\n8ccq1oAqlCYWMn//AgMBAAEB\""
 ]

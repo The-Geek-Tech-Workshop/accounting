@@ -17,7 +17,7 @@ export const addStarlingTransaction = async ({
       {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${starling.accessToken}`,
+          Authorization: `Bearer ${starling.accessToken()}`,
           Accept: "application/json",
         },
       }
@@ -33,19 +33,22 @@ export const addStarlingTransaction = async ({
 
     // Construct the URL for a specific feed item
     const starlingApiUrl = `${starling.url}/feed/account/${accountUid}/category/${categoryUid}/${feedItemUid}`;
+    console.log(starlingApiUrl);
 
     // Fetch specific transaction from Starling API
     const starlingResponse = await fetch(starlingApiUrl, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${starling.accessToken}`,
+        Authorization: `Bearer ${starling.accessToken()}`,
         Accept: "application/json",
       },
     });
 
     if (!starlingResponse.ok) {
       throw new Error(
-        `Starling API error: ${starlingResponse.status} ${starlingResponse.statusText}`
+        `Starling API error: ${starlingResponse.status} ${
+          starlingResponse.statusText
+        }: ${await starlingResponse.text()}`
       );
     }
 
@@ -64,7 +67,7 @@ export const addStarlingTransaction = async ({
     const targetResponse = await fetch(`${accounting.url}/starling/feed-item`, {
       method: "POST",
       headers: {
-        "X-API-Key": accounting.apiKey,
+        "X-API-Key": accounting.apiKey(),
         "Content-Type": "application/json",
         Accept: "application/json",
       },

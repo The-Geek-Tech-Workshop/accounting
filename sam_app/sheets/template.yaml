@@ -6,14 +6,10 @@ Description: |
 Parameters:
   SpreadsheetId:
     Type: String
-  GCPProjectNumber:
-    Type: String
-  GCPProjectId:
-    Type: String
 
 Globals:
   Function:
-    Timeout: 10
+    Timeout: 30
     Handler: app.lambdaHandler
     Runtime: nodejs20.x
     Architectures:
@@ -27,8 +23,7 @@ Resources:
       Environment:
         Variables:
           SPREADSHEET_ID: !Ref SpreadsheetId
-          GOOGLE_AUDIENCE: !Sub "//iam.googleapis.com/projects/${GCPProjectNumber}/locations/global/workloadIdentityPools/aws-pool/providers/aws-provider"
-          GOOGLE_SERVICE_ACCOUNT: !Sub "sheets-writer@${GCPProjectId}.iam.gserviceaccount.com"
+          GOOGLE_APPLICATION_CREDENTIALS: google_credentials.json
       Policies:
         - Statement:
             - Effect: Allow

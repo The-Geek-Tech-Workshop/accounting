@@ -13,17 +13,19 @@ const validateCredential = (name, value) => {
 
 export default {
   accounting: {
-    url: "https://hn93t12th7.execute-api.eu-west-2.amazonaws.com/Prod",
-    apiKey: validateCredential(
-      "Accounting",
-      process.env.ACCOUNTING_API_KEY || credentials.accountingApiKey
-    ),
+    url: "https://9h354zd4ac.execute-api.eu-west-2.amazonaws.com/Prod",
+    apiKey: () =>
+      validateCredential(
+        "Accounting",
+        process.env.ACCOUNTING_API_KEY || credentials.accountingApiKey
+      ),
   },
   starling: {
     url: "https://api.starlingbank.com/api/v2",
-    accessToken: validateCredential(
-      "Starling",
-      process.env.STARLING_ACCESS_TOKEN || credentials.starlingAccessToken
-    ),
+    accessToken: () =>
+      validateCredential(
+        "Starling",
+        process.env.STARLING_ACCESS_TOKEN || credentials.starlingAccessToken
+      ),
   },
 };

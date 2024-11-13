@@ -7,10 +7,6 @@ Parameters:
     Type: String
   SpreadsheetId:
     Type: String
-  GCPProjectNumber:
-    Type: String
-  GCPProjectId:
-    Type: String
 
 Globals:
   Function:
@@ -40,5 +36,3 @@ Resources:
       Location: sheets/template.yaml
       Parameters:
         SpreadsheetId: !Ref SpreadsheetId
-        GCPProjectNumber: !Ref GCPProjectNumber
-        GCPProjectId: !Ref GCPProjectId

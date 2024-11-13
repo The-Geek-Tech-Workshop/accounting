@@ -16,9 +16,6 @@ const a1Range = `Transactions!A${a1RangeRowNumber}:I${a1RangeRowNumber}`;
 
 const auth = new GoogleAuth({
   scopes: SCOPES,
-  targetPrincipal: process.env.GOOGLE_SERVICE_ACCOUNT,
-  audience: process.env.GOOGLE_AUDIENCE,
-  useWorkloadIdentityFederation: true,
 });
 const client = await auth.getClient();
 const sheetsApi = google.sheets({ version: "v4", auth: client });
