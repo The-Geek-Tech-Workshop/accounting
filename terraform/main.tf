@@ -44,6 +44,6 @@ resource "google_service_account_iam_binding" "workload_identity_user" {
   service_account_id = google_service_account.sheets_writer.name
   role               = "roles/iam.workloadIdentityUser"
   members = [
-    "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.aws_pool.name}/attribute.aws_role/sheets-writer"
+    "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.aws_pool.name}/subject/sheets-writer"
   ]
 }

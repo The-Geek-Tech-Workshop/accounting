@@ -33,7 +33,6 @@ export const addStarlingTransaction = async ({
 
     // Construct the URL for a specific feed item
     const starlingApiUrl = `${starling.url}/feed/account/${accountUid}/category/${categoryUid}/${feedItemUid}`;
-    console.log(starlingApiUrl);
 
     // Fetch specific transaction from Starling API
     const starlingResponse = await fetch(starlingApiUrl, {
