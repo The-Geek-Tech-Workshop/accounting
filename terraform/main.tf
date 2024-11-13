@@ -17,7 +17,7 @@ resource "google_iam_workload_identity_pool_provider" "aws" {
   }
 
   attribute_mapping = {
-    "google.subject"        = "assertion.arn"
+    "google.subject"        = "assertion.arn.extract('/([^/]+)$')"
     "attribute.aws_role"    = "assertion.arn.extract('assumed-role/({.*?})/')"
     "attribute.aws_account" = "assertion.account"
   }
@@ -43,9 +43,7 @@ data "google_project" "gcp_project" {}
 resource "google_service_account_iam_binding" "workload_identity_user" {
   service_account_id = google_service_account.sheets_writer.name
   role               = "roles/iam.workloadIdentityUser"
-  # member             = "principalSet://iam.googleapis.com/projects/${data.google_project.gcp_project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.aws_pool.workload_identity_pool_id}/attribute.aws_role/sheets-writer"
   members = [
     "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.aws_pool.name}/attribute.aws_role/sheets-writer"
   ]
-  
 }
