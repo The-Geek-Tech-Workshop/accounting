@@ -17,7 +17,7 @@ resource "google_iam_workload_identity_pool_provider" "aws" {
   }
 
   attribute_mapping = {
-    "google.subject"        = "assertion.arn.extract('/([^/]+)$')"
+    "google.subject"        = "assertion.arn.extract('assumed-role/(.*?)/')"
     "attribute.aws_role"    = "assertion.arn.extract('assumed-role/({.*?})/')"
     "attribute.aws_account" = "assertion.account"
   }
