@@ -21,7 +21,8 @@
         "dbaeumer.vscode-eslint",
         "redhat.vscode-yaml",
         "esbenp.prettier-vscode",
-        "HashiCorp.terraform"
+        "HashiCorp.terraform",
+        "GitHub.vscode-github-actions"
       ],
       "settings": {
         "[javascript]": {
