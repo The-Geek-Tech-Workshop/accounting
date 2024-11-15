@@ -17,8 +17,8 @@ resource "google_iam_workload_identity_pool_provider" "aws" {
   }
 
   attribute_mapping = {
-    "google.subject"        = "assertion.arn.extract('assumed-role/.*?/(.*?)$ ')",
-    "attribute.aws_role"    = "assertion.arn.extract('assumed-role/(.*?)/')"
+    "google.subject"        = "assertion.arn.extract('assumed-role/{role_name}/')"
+    "attribute.aws_role"    = "assertion.arn.extract('assumed-role/{role_name}/')"
     "attribute.aws_account" = "assertion.account"
   }
 }
@@ -37,13 +37,9 @@ resource "google_service_account" "sheets_writer" {
 #   member  = "serviceAccount:${google_service_account.sheets_writer.email}"
 # }
 
-data "google_project" "gcp_project" {}
-
 # Allow AWS to impersonate the service account
-resource "google_service_account_iam_binding" "workload_identity_user" {
+resource "google_service_account_iam_member" "workload_identity_user" {
   service_account_id = google_service_account.sheets_writer.name
   role               = "roles/iam.workloadIdentityUser"
-  members = [
-    "principalSet://iam.googleapis.com/projects/${data.google_project.gcp_project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.aws_pool.id}/attribute.aws_role/accounting-SheetsModule-7Z09S-TransactionWriterRole-jt6HLB2CoWVP"
-  ]
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.aws_pool.name}/attribute.aws_role/accounting-SheetsModule-7Z09S-TransactionWriterRole-jt6HLB2CoWVP"
 }
