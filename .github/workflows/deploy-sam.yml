@@ -25,6 +25,10 @@ jobs:
       - name: Setup SAM CLI
         uses: aws-actions/setup-sam@v2
 
+      - name: Create personal.json
+        run: |
+          echo '${{ secrets.PERSONAL_DATA }}' > sam_app/starling/feed_item_to_transaction/personal.json
+
       - name: Build SAM application
         run: |
           cd sam_app
