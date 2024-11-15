@@ -2,6 +2,7 @@ import google from "@googleapis/sheets";
 import { GoogleAuth } from "google-auth-library";
 
 const SCOPES = [
+  "https://www.googleapis.com/auth/cloudplatformprojects.readonly",
   "https://www.googleapis.com/auth/spreadsheets",
   "https://www.googleapis.com/auth/drive.file",
 ];
