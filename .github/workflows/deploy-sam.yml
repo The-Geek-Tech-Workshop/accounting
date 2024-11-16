@@ -30,6 +30,13 @@ jobs:
         run: |
           echo '${{ secrets.PERSONAL_DATA }}' > sam_app/starling/feed_item_to_transaction/personal.json
 
+      - name: Create ebay-auth.json files
+        run: |
+          for dir in sam_app/ebay/order_enricher sam_app/ebay/token_gen sam_app/ebay/transaction_fetcher sam_app/ebay/non_sale_charge_to_transaction sam_app/ebay/shipping_label_to_transaction sam_app/ebay/sale_to_transaction sam_app/ebay/refund_to_transaction
+          do
+            echo '${{ secrets.EBAY_AUTH }}' > $dir/ebay-auth.json
+          done
+
       - name: Build SAM application
         run: |
           cd sam_app
