@@ -24,6 +24,7 @@ Resources:
         Variables:
           SPREADSHEET_ID: !Ref SpreadsheetId
           GOOGLE_APPLICATION_CREDENTIALS: google_credentials.json
+          GCLOUD_PROJECT: grand-incentive-428409-j0
       Policies:
         - Statement:
             - Effect: Allow
