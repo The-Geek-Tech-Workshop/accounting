@@ -1,2 +1,2 @@
 #!/bin/bash
-docker run  -it -v EbayVolume:/root/.config/configstore thegeektechworkshop/ebay-cli $@
+docker run  -it -v /home/vscode/.config/configstore:/root/.config/configstore thegeektechworkshop/ebay-cli $@

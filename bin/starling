@@ -1,2 +1,2 @@
 #!/bin/bash
-docker run  -it -v StarlingVolume:/root/.config/configstore thegeektechworkshop/starling-cli $@
+docker run  -it -v /home/vscode/.config/configstore:/root/.config/configstore thegeektechworkshop/starling-cli $@
