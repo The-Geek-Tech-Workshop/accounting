@@ -33,5 +33,9 @@
     }
   },
 
+  "mounts": [
+    { "source": "config-volume-accounting", "target": "$HOME/.config", "type": "volume" }
+  ],
+
   "postCreateCommand": "bash .devcontainer/create_auth_files.sh && bash .devcontainer/pull_docker_images.sh"
 }
