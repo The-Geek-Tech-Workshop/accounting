@@ -21,7 +21,7 @@ s3_prefix = "accounting"
 region = "eu-west-2"
 parameter_overrides = [
     "SpreadsheetId=\"1x_P7IH0Tp_7IvpAM5pDk_X3sRsZy7BBUljK40Q0JAZs\"",
-    "StarlingPublicKey=\"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp4p6DWMKTOihxDR2Rpg7fD5FSlcc2alM5is5WN+62eaT0LPvqLs20COQrh6VFBa6UgWmFo9you0LlKnrDMzTJPxXDljLaYUtHWyb0xbXqPf6pNXTKxQJmZZrFGQ6HveVsN+Qz6P4q0tuXgjhkRCw0mKVJ0Wrko8tR3K/ps4Rwxyme2F7fGsk1WwE31I95xn3/YChQZ1Q4bWC4fsFwcYWX6AspUYU6bbJVE5u7JuNBh1LQorqKNmnuCfq5hunocXAedH/k+FYk8GIfcVPIz9iKJNqzxl4zjXkgOJcPkb1lnInvI4VshciSH3NhSXlcCQl2L4ICwkxvH7sZP0cNv/UeQIDAQAB\"",
+    "StarlingPublicKey=\"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoxlbr4jLxPn0yUQDDRQWZWU/hmmN5Q/pZhI8N3M+ry894HRXx2S4oYYdF6gnECxD/4zbVtFMc04YW5B46sl1vbxFRuGP2TqL7KPufKev89mLLod15WiqQDVtcWMOYwDmbNGDT8lgAtx6mScyXAqdbjPfIcEMiwQbC6FZuNOiNMwyp8meKf3i9W4/Dyu7GDDUjFr6rzND/y+0+3GG4JRPPNiV8fdUy83zsT2dTZ6cueUZZu1r/t0yPPyCcJRkNjb4gu/t2usCHBJ9YqCDtOtNcgqAhnt5Sf8rpfdBRNR8YrfoJyqXr/OZuJkC/xpKHPJAuqHbKmaR+/f0ZxNonwD8qQIDAQAB\"",
     ]
 image_repositories = []
 
