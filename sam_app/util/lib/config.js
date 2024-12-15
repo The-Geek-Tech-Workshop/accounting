@@ -13,7 +13,7 @@ const validateCredential = (name, value) => {
 
 export default {
   accounting: {
-    url: "https://6l43vhfqqh.execute-api.eu-west-2.amazonaws.com/Prod",
+    url: "https://9h354zd4ac.execute-api.eu-west-2.amazonaws.com/Prod",
     apiKey: () =>
       validateCredential(
         "Accounting",
