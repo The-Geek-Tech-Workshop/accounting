@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: |
   Accounting - Ebay module
@@ -122,7 +122,7 @@ Resources:
             Arn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
           Permissions:
             - Write
-            
+
   ShippingLabelToTransaction:
     Type: AWS::Serverless::Function
     Properties:
