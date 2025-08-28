@@ -15,14 +15,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh && \
     bash nodesource_setup.sh && \
     rm nodesource_setup.sh
 
+ARG AWSCLI_VERSION=2.28.19
+ARG SAM_CLI_VERSION=1.143.0
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    awscli \
     python3-pip \
     python3-venv \
     apt-transport-https \
     ca-certificates \
     gnupg \
     curl \
+    unzip \
     google-cloud-cli \
     software-properties-common \
     terraform \
@@ -30,7 +32,14 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 
 RUN pip install cfn-lint
 
-RUN wget https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip && \
+## Install AWS CLI v2
+RUN curl -fsSLO "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${AWSCLI_VERSION}.zip" && \
+    unzip awscli-exe-linux-x86_64-${AWSCLI_VERSION}.zip && \
+    ./aws/install && \
+    rm -rf awscli-exe-linux-x86_64-${AWSCLI_VERSION}.zip aws
+
+## Install AWS SAM CLI
+RUN curl -fsSLO "https://github.com/aws/aws-sam-cli/releases/download/v${SAM_CLI_VERSION}/aws-sam-cli-linux-x86_64.zip" && \
     unzip aws-sam-cli-linux-x86_64.zip -d sam-installation && \
     ./sam-installation/install && \
     rm aws-sam-cli-linux-x86_64.zip && \

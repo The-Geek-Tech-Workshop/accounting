@@ -33,9 +33,5 @@
     }
   },
 
-  "mounts": [
-    { "source": "config-volume-accounting", "target": "/home/vscode/.config", "type": "volume" }
-  ],
-
   "postCreateCommand": "bash .devcontainer/pull_docker_images.sh"
 }
