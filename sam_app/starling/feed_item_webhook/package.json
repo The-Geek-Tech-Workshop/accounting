@@ -5,9 +5,9 @@
   "main": "app.js",
   "author": "Andrew Todd",
   "dependencies": {
-    "@aws-sdk/client-eventbridge": "^3.658.1",
+    "@aws-sdk/client-eventbridge": "^3.1016.0",
     "accounting_constants": "file:../../accounting_constants",
-    "axios": ">=1.7.4"
+    "axios": ">=1.13.5"
   },
   "scripts": {
     "test": "mocha tests/unit/"
